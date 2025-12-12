@@ -1,7 +1,6 @@
 use std::fmt::Debug;
 
 use cubecl::{Runtime, client::ComputeClient, tensor_line_size_parallel};
-use cubek_std::test_utils::contiguous_strides;
 
 use crate::launch::{AttentionDefinition, AttentionIdent};
 
@@ -27,7 +26,7 @@ impl AttentionLineSizes {
             tensor_line_size_parallel(
                 supported_line_sizes,
                 shape,
-                &contiguous_strides(shape, false),
+                &contiguous_strides(shape),
                 shape.len() - 1,
             )
         };
@@ -53,4 +52,13 @@ impl AttentionLineSizes {
             ),
         }
     }
+}
+
+pub(crate) fn contiguous_strides(shape: &[usize]) -> Vec<usize> {
+    let rank = shape.len();
+    let mut strides = vec![1; rank];
+    for i in (0..rank - 1).rev() {
+        strides[i] = strides[i + 1] * shape[i + 1];
+    }
+    strides
 }
