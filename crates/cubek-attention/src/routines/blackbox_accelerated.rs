@@ -3,7 +3,6 @@ use cubek_matmul::components::{global::PartitionedStageFamily, stage::StridedSta
 
 use crate::components::stage::plane::PlanePartitionStageAttentionFamily;
 use crate::components::tile::accelerated::BlackboxAcceleratedTileAttention;
-#[cfg(target_os = "macos")]
 use crate::launch::AttentionTileSize;
 use crate::launch::{
     AttentionBlueprint, AttentionDefinition, AttentionElems, AttentionPartitionSize,
