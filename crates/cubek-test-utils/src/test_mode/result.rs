@@ -59,13 +59,6 @@ impl TestOutcome {
     ///
     /// This is a convenience wrapper around
     /// `current_test_mode().decide(self).enforce()`.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// let outcome = assert_equals_approx(&actual, &expected, 0.001).as_test_outcome();
-    /// outcome.enforce(); // panics if TestMode rejects it
-    /// ```
     pub fn enforce(self) {
         current_test_mode().decide(self).enforce();
     }

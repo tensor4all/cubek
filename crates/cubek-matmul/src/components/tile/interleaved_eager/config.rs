@@ -4,11 +4,11 @@ use crate::components::stage::SwizzleMode;
 use crate::definition::{StageIdent, TileSize};
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-pub struct InterleavedMatmulConfig {
+pub struct InterleavedEagerMatmulConfig {
     pub shared: SharedTileConfig,
 }
 
-impl InterleavedMatmulConfig {
+impl InterleavedEagerMatmulConfig {
     pub fn from_shared_tile_config(config: SharedTileConfig) -> Self {
         Self { shared: config }
     }
@@ -42,7 +42,7 @@ impl InterleavedMatmulConfig {
     }
 }
 
-impl TileConfig for InterleavedMatmulConfig {
+impl TileConfig for InterleavedEagerMatmulConfig {
     fn plane_dim(&self) -> u32 {
         self.shared.plane_dim()
     }

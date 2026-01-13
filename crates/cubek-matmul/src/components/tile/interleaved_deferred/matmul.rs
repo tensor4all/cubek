@@ -1,8 +1,8 @@
 use cubecl::prelude::*;
 
-use crate::components::tile::interleaved::config::InterleavedMatmulConfig;
-use crate::components::tile::interleaved::reader::InterleavedStageReader;
-use crate::components::tile::interleaved::writer::InterleavedStageWriter;
+use crate::components::tile::interleaved_deferred::config::InterleavedDeferredMatmulConfig;
+use crate::components::tile::interleaved_deferred::reader::InterleavedStageReader;
+use crate::components::tile::interleaved_deferred::writer::InterleavedStageWriter;
 use crate::components::tile::io::Strided;
 use crate::components::tile::tile_data::StridedTile;
 use crate::components::tile::{TileMatmul, io::Filled};
@@ -12,11 +12,11 @@ use crate::definition::{MatrixLayout, StageIdent};
 /// partial dot-product over K.
 ///
 /// Important: the plane must combine those contributions at the end of the global matmul.
-pub struct InterleavedMatmul {}
+pub struct InterleavedDeferredMatmul {}
 
 #[derive(CubeType)]
 /// InterleavedFragment: each unit owns a stripe of the input tile.
-pub struct InterleavedFragment<E: Numeric> {
+pub struct InterleavedDeferredFragment<E: Numeric> {
     pub array: Array<E>,
     #[cube(comptime)]
     pub layout: MatrixLayout,
@@ -27,7 +27,7 @@ pub struct InterleavedFragment<E: Numeric> {
 }
 
 #[cube]
-impl<E: Numeric> InterleavedFragment<E> {
+impl<E: Numeric> InterleavedDeferredFragment<E> {
     fn get(&self, i: usize, j: usize) -> E {
         match comptime!(self.layout) {
             MatrixLayout::RowMajor => self.array[i * self.col_count + j],
@@ -39,7 +39,7 @@ impl<E: Numeric> InterleavedFragment<E> {
 #[derive(CubeType)]
 /// InterleavedAccumulator: each unit holds a full accumulator with partial K contributions,
 /// combined later via `consolidate`.
-pub struct InterleavedAccumulator<E: Numeric> {
+pub struct InterleavedDeferredAccumulator<E: Numeric> {
     pub array: Array<E>,
     #[cube(comptime)]
     pub layout: MatrixLayout,
@@ -50,7 +50,7 @@ pub struct InterleavedAccumulator<E: Numeric> {
 }
 
 #[cube]
-impl<E: Numeric> InterleavedAccumulator<E> {
+impl<E: Numeric> InterleavedDeferredAccumulator<E> {
     /// Every unit will hold the sum
     pub fn consolidate(&mut self) {
         #[unroll]
@@ -61,15 +61,15 @@ impl<E: Numeric> InterleavedAccumulator<E> {
 }
 
 #[cube]
-impl<L: Numeric, R: Numeric, A: Numeric> TileMatmul<L, R, A> for InterleavedMatmul {
-    type Config = InterleavedMatmulConfig;
+impl<L: Numeric, R: Numeric, A: Numeric> TileMatmul<L, R, A> for InterleavedDeferredMatmul {
+    type Config = InterleavedDeferredMatmulConfig;
 
     // Size m * k_local
-    type LhsFragment = InterleavedFragment<L>;
+    type LhsFragment = InterleavedDeferredFragment<L>;
     // Size k_local * n
-    type RhsFragment = InterleavedFragment<R>;
+    type RhsFragment = InterleavedDeferredFragment<R>;
     // Size m * n
-    type AccFragment = InterleavedAccumulator<A>;
+    type AccFragment = InterleavedDeferredAccumulator<A>;
 
     type LhsTile = Strided;
     type RhsTile = Strided;
@@ -106,7 +106,7 @@ impl<L: Numeric, R: Numeric, A: Numeric> TileMatmul<L, R, A> for InterleavedMatm
     ) -> Self::LhsFragment {
         let row_count = config.elements_per_unit_m();
         let col_count = config.elements_per_unit_k();
-        InterleavedFragment::<L> {
+        InterleavedDeferredFragment::<L> {
             array: Array::new(row_count * col_count),
             layout,
             row_count,
@@ -120,7 +120,7 @@ impl<L: Numeric, R: Numeric, A: Numeric> TileMatmul<L, R, A> for InterleavedMatm
     ) -> Self::RhsFragment {
         let row_count = config.elements_per_unit_k();
         let col_count = config.elements_per_unit_n();
-        InterleavedFragment::<R> {
+        InterleavedDeferredFragment::<R> {
             array: Array::new(row_count * col_count),
             layout,
             row_count,
@@ -134,7 +134,7 @@ impl<L: Numeric, R: Numeric, A: Numeric> TileMatmul<L, R, A> for InterleavedMatm
     ) -> Self::AccFragment {
         let m = config.elements_per_unit_m();
         let n = config.elements_per_unit_n();
-        InterleavedAccumulator::<A> {
+        InterleavedDeferredAccumulator::<A> {
             array: Array::new(m * n),
             layout,
             m,

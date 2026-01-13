@@ -1,6 +1,8 @@
 use crate::components::tile::StridedTile;
-use crate::components::tile::interleaved::config::InterleavedMatmulConfig;
-use crate::components::tile::interleaved::{InterleavedAccumulator, InterleavedFragment};
+use crate::components::tile::interleaved_eager::config::InterleavedEagerMatmulConfig;
+use crate::components::tile::interleaved_eager::{
+    InterleavedEagerAccumulator, InterleavedEagerFragment,
+};
 use crate::definition::{MatrixLayout, StageIdent};
 use cubecl::prelude::*;
 
@@ -11,9 +13,9 @@ pub struct InterleavedStageReader {}
 impl InterleavedStageReader {
     pub fn load_fragment<E: Numeric, V: Numeric>(
         tile: &StridedTile<V>,
-        fragment: &mut InterleavedFragment<E>,
+        fragment: &mut InterleavedEagerFragment<E>,
         #[comptime] ident: StageIdent,
-        #[comptime] config: InterleavedMatmulConfig,
+        #[comptime] config: InterleavedEagerMatmulConfig,
     ) {
         let (m, n, k_local) = (
             config.elements_per_unit_m(),
@@ -64,8 +66,8 @@ impl InterleavedStageReader {
 
     pub fn load_accumulator<A: Numeric, V: Numeric>(
         value: &V,
-        fragment: &mut InterleavedAccumulator<A>,
-        #[comptime] config: InterleavedMatmulConfig,
+        fragment: &mut InterleavedEagerAccumulator<A>,
+        #[comptime] config: InterleavedEagerMatmulConfig,
     ) {
         let size = config.elements_per_unit_m() * config.elements_per_unit_n();
 

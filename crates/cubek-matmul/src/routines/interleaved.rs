@@ -4,7 +4,8 @@ use std::fmt::Display;
 use std::marker::PhantomData;
 
 use crate::components::batch::BatchMatmulFamily;
-use crate::components::tile::interleaved::InterleavedMatmul;
+use crate::components::tile::interleaved_deferred::InterleavedDeferredMatmul;
+use crate::components::tile::interleaved_eager::InterleavedEagerMatmul;
 use crate::definition::{
     CubeCountStrategy, GlobalOrderStrategy, HypercubeBlueprint, MatmulElems, MatmulLineSizes,
     MatmulProblem, MatmulSetupError, MultiRowStrategy, SmAllocation, TilingBlueprint, TilingScheme,
@@ -61,7 +62,8 @@ where
     type BatchMatmul = PartitionedBatchMatmulFamily<
         SimpleMatmulFamily<
             PlaneMatmulFamily<
-                InterleavedMatmul,
+                // InterleavedDeferredMatmul,
+                InterleavedEagerMatmul,
                 StridedStageFamily,
                 StridedStageFamily,
                 FilledStageFamily,
@@ -82,7 +84,7 @@ where
     ) -> Result<LaunchInfo<TilingBlueprint>, MatmulSetupError> {
         let mut dtypes = MatmulElems::from_globals(&problem.global_dtypes);
 
-        if InterleavedMatmul::can_cast_stage_element() {
+        if InterleavedDeferredMatmul::can_cast_stage_element() {
             dtypes.adjust_stage_dtypes();
         }
 
@@ -91,7 +93,7 @@ where
             BlueprintStrategy::Forced(blueprint) => (blueprint.clone(), dtypes),
             BlueprintStrategy::Inferred(strategy) => {
                 if strategy.multi_rows {
-                    infer_blueprint_multi_rows::<R, InterleavedMatmul>(
+                    infer_blueprint_multi_rows::<R, InterleavedDeferredMatmul>(
                         client,
                         problem,
                         device_settings.plane_dim,
@@ -99,7 +101,7 @@ where
                         &device_settings.line_sizes,
                     )
                 } else {
-                    infer_blueprint_plane::<InterleavedMatmul, R>(
+                    infer_blueprint_plane::<InterleavedDeferredMatmul, R>(
                         client,
                         problem,
                         device_settings.plane_dim,
@@ -108,7 +110,7 @@ where
                         PlaneTilingBlueprintOptions {
                             partition_buffering: Some(PartitionBuffering::Single),
                             tiny_selection_enabled: true,
-                            swizzled: InterleavedMatmul::should_swizzle(client),
+                            swizzled: InterleavedDeferredMatmul::should_swizzle(client),
                             ..Default::default()
                         },
                     )

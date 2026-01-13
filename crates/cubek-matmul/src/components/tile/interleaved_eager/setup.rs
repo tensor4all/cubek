@@ -1,7 +1,7 @@
 use crate::components::resource::CubeDimResource;
 use crate::components::tile::SharedTileConfig;
-use crate::components::tile::interleaved::InterleavedMatmul;
-use crate::components::tile::interleaved::config::InterleavedMatmulConfig;
+use crate::components::tile::interleaved_eager::InterleavedEagerMatmul;
+use crate::components::tile::interleaved_eager::config::InterleavedEagerMatmulConfig;
 use crate::components::tile::{
     TileMatmulFamily,
     io::{Filled, Strided},
@@ -13,9 +13,9 @@ use cubecl::ir::{ElemType, FloatKind};
 use cubecl::prelude::*;
 use cubecl::{features::TypeUsage, ir::DeviceProperties};
 
-impl TileMatmulFamily for InterleavedMatmul {
-    type Config = InterleavedMatmulConfig;
-    type Matmul<L: Numeric, R: Numeric, A: Numeric> = InterleavedMatmul;
+impl TileMatmulFamily for InterleavedEagerMatmul {
+    type Config = InterleavedEagerMatmulConfig;
+    type Matmul<L: Numeric, R: Numeric, A: Numeric> = InterleavedEagerMatmul;
 
     type LhsTile = Strided;
     type RhsTile = Strided;
@@ -40,7 +40,7 @@ impl TileMatmulFamily for InterleavedMatmul {
         _dtypes: &MatmulElems,
         _line_sizes: &MatmulLineSizes,
     ) -> Result<Self::Config, MatmulSetupError> {
-        Ok(InterleavedMatmulConfig::from_shared_tile_config(
+        Ok(InterleavedEagerMatmulConfig::from_shared_tile_config(
             SharedTileConfig::new(
                 blueprint.tiling_scheme.tile_size,
                 blueprint.plane_dim,

@@ -2,7 +2,7 @@ use cubecl::prelude::*;
 
 use crate::components::tile::{
     StridedTile,
-    interleaved::{InterleavedAccumulator, config::InterleavedMatmulConfig},
+    interleaved_deferred::{InterleavedDeferredAccumulator, config::InterleavedDeferredMatmulConfig},
 };
 
 /// Writer for the interleaved matmul fragments.
@@ -15,8 +15,8 @@ pub struct InterleavedStageWriter {}
 impl InterleavedStageWriter {
     pub fn store_fragment<A: Numeric, E: Numeric>(
         tile: &mut StridedTile<E, ReadWrite>,
-        acc: &InterleavedAccumulator<A>,
-        #[comptime] config: InterleavedMatmulConfig,
+        acc: &InterleavedDeferredAccumulator<A>,
+        #[comptime] config: InterleavedDeferredMatmulConfig,
     ) {
         if UNIT_POS_X == 0 {
             let out_line_size = tile.stage.line_size().comptime() as u32;
