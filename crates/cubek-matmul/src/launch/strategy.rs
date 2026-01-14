@@ -10,7 +10,10 @@ use crate::{
             sync_full_tilewise,
         },
         stage::{ColMajorTilingOrder, RowMajorTilingOrder},
-        tile::{cmma::CmmaMatmul, io::Filled, mma::MmaMatmul},
+        tile::{
+            cmma::CmmaMatmul, interleaved_deferred::InterleavedDeferredMatmul,
+            interleaved_eager::InterleavedEagerMatmul, io::Filled, mma::MmaMatmul,
+        },
     },
     definition::{MatmulElems, MatmulSetupError},
     launch::{handle::MatmulInputHandleRef, launch_naive, launch_tiling},
@@ -22,6 +25,7 @@ use crate::{
             TilewiseDoubleBufferingAlgorithm, TmaDoubleBufferingAlgorithm,
         },
         double_unit::DoubleUnitAlgorithm,
+        interleaved::InterleavedAlgorithm,
         ordered_double_buffering::OrderedDoubleBufferingAlgorithm,
         simple::{SimpleAlgorithm, SimpleTmaAlgorithm},
         simple_unit::SimpleUnitAlgorithm,
@@ -145,6 +149,8 @@ pub enum Strategy {
     DoubleUnit(BlueprintStrategy<DoubleUnitAlgorithm>),
     SimpleVecMat(BlueprintStrategy<SimpleVecMatAlgorithm>),
     DoubleVecMat(BlueprintStrategy<DoubleVecMatAlgorithm>),
+    InterleavedDeferred(BlueprintStrategy<InterleavedAlgorithm<InterleavedDeferredMatmul>>),
+    InterleavedEager(BlueprintStrategy<InterleavedAlgorithm<InterleavedEagerMatmul>>),
     Naive,
     #[default]
     Auto,
@@ -289,6 +295,12 @@ impl Display for Strategy {
             Strategy::DoubleVecMat(blueprint_strategy) => {
                 f.write_fmt(format_args!("matmul_double_vecmat{}", blueprint_strategy))
             }
+            Strategy::InterleavedDeferred(blueprint_strategy) => {
+                f.write_str("matmul_interleaved_deferred{}")
+            }
+            Strategy::InterleavedEager(blueprint_strategy) => {
+                f.write_str("matmul_interleaved_eager{}")
+            }
             Strategy::Naive => f.write_str("matmul_naive"),
             Strategy::Auto => f.write_str("matmul_auto"),
         }
@@ -412,6 +424,12 @@ impl Strategy {
                 launch_tiling::launch_ref(client, lhs, rhs, out, selection, dtypes)
             }
             Strategy::DoubleVecMat(selection) => {
+                launch_tiling::launch_ref(client, lhs, rhs, out, selection, dtypes)
+            }
+            Strategy::InterleavedDeferred(selection) => {
+                launch_tiling::launch_ref(client, lhs, rhs, out, selection, dtypes)
+            }
+            Strategy::InterleavedEager(selection) => {
                 launch_tiling::launch_ref(client, lhs, rhs, out, selection, dtypes)
             }
             Strategy::Naive => launch_naive::launch_ref(client, lhs, rhs, out, dtypes),

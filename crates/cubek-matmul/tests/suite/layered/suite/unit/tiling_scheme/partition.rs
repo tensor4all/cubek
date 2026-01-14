@@ -9,6 +9,17 @@ mod p1x1x4 {
     include!("stage.rs");
 }
 
+mod p2x1x1 {
+    use super::*;
+    use cubek_matmul::definition::{PartitionSize, TilingSchemeBuilder};
+
+    fn partition(builder: TilingSchemeBuilder) -> TilingSchemeBuilder {
+        builder.with_partition_size(PartitionSize { m: 2, n: 1, k: 1 })
+    }
+
+    include!("stage.rs");
+}
+
 mod p2x1x4 {
     use super::*;
     use cubek_matmul::definition::{PartitionSize, TilingSchemeBuilder};
@@ -20,13 +31,13 @@ mod p2x1x4 {
     include!("stage.rs");
 }
 
-mod p2x2x1 {
-    use super::*;
-    use cubek_matmul::definition::{PartitionSize, TilingSchemeBuilder};
+// mod p2x2x1 {
+//     use super::*;
+//     use cubek_matmul::definition::{PartitionSize, TilingSchemeBuilder};
 
-    fn partition(builder: TilingSchemeBuilder) -> TilingSchemeBuilder {
-        builder.with_partition_size(PartitionSize { m: 2, n: 2, k: 1 })
-    }
+//     fn partition(builder: TilingSchemeBuilder) -> TilingSchemeBuilder {
+//         builder.with_partition_size(PartitionSize { m: 2, n: 2, k: 1 })
+//     }
 
-    include!("stage.rs");
-}
+//     include!("stage.rs");
+// }

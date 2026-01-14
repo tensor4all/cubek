@@ -29,7 +29,11 @@ impl InterleavedStageWriter {
             let index = i as u32 * config.plane_dim() + UNIT_POS_X;
             let offs = tile.stage_offset(index);
             let elem = acc.array[i];
+            // if UNIT_POS_X != 0 {
             tile.stage[offs as usize] = Line::cast_from(elem);
+            // } else {
+            //     tile.stage[offs as usize] = Line::cast_from(0);
+            // }
         }
     }
 }

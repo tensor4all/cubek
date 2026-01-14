@@ -17,8 +17,9 @@ use cubek::{
         launch::{MatmulInputHandle, Strategy},
         routines::{
             BlueprintStrategy, TileSizeSelection, double_buffering::DoubleBufferingArgs,
-            double_unit::DoubleUnitSelectionArgs, ordered_double_buffering::OrderedSelectionArgs,
-            simple::SimpleArgs, simple_unit::SimpleUnitSelectionArgs,
+            double_unit::DoubleUnitSelectionArgs, interleaved::InterleavedArgs,
+            ordered_double_buffering::OrderedSelectionArgs, simple::SimpleArgs,
+            simple_unit::SimpleUnitSelectionArgs,
         },
     },
     random::random_uniform,
@@ -37,10 +38,11 @@ impl<R: Runtime> Benchmark for MatmulBench<R> {
             vec![self.b, self.m, self.k],
             self.dtypes.lhs_global,
         );
-        if self.tl {
-            let len = lhs.shape.len();
-            lhs.strides.swap(len - 2, len - 1);
-        }
+
+        let b_stride = self.m * self.k;
+        let (row_stride, col_stride) = if self.tl { (1, self.m) } else { (self.k, 1) };
+        lhs.strides = vec![b_stride, row_stride, col_stride];
+
         random_uniform(&client, 0.0, 1.0, lhs.as_ref(), self.dtypes.lhs_global).unwrap();
 
         let mut rhs = TensorHandle::empty(
@@ -49,10 +51,9 @@ impl<R: Runtime> Benchmark for MatmulBench<R> {
             self.dtypes.rhs_global,
         );
 
-        if self.tr {
-            let len = rhs.shape.len();
-            rhs.strides.swap(len - 2, len - 1);
-        }
+        let b_stride_rhs = self.k * self.n;
+        let (row_stride_rhs, col_stride_rhs) = if self.tr { (1, self.k) } else { (self.n, 1) };
+        rhs.strides = vec![b_stride_rhs, row_stride_rhs, col_stride_rhs];
 
         random_uniform(&client, 0.0, 1.1, rhs.as_ref(), self.dtypes.rhs_global).unwrap();
 
@@ -142,8 +143,8 @@ fn entry(m: usize, n: usize, k: usize) -> (usize, usize, usize, usize) {
 
 #[allow(dead_code, clippy::single_element_loop)]
 fn run<R: Runtime, MP: MatmulPrecision>(device: R::Device, strategy: Strategy) {
-    for tl in [MatrixLayout::ColMajor, MatrixLayout::RowMajor] {
-        for tr in [MatrixLayout::ColMajor, MatrixLayout::RowMajor] {
+    for tl in [MatrixLayout::RowMajor, MatrixLayout::ColMajor] {
+        for tr in [MatrixLayout::RowMajor, MatrixLayout::ColMajor] {
             for (b, m, n, k) in [
                 // entry(8192, 8192, 8192),
                 // entry(6144, 6144, 6144),
@@ -162,7 +163,7 @@ fn run<R: Runtime, MP: MatmulPrecision>(device: R::Device, strategy: Strategy) {
                 // entry(1024, 10, 10),
                 // (16, 1, 2048, 8192),
                 // (16, 1, 4096, 4096),
-                (1, 512, 512, 512),
+                (4, 512, 512, 2048),
                 // (2, 8192, 8192, 1), // Outer
                 // (2, 8192, 1, 8192), // MatVec
                 //(2, 1, 8192, 8192), // VecMat
@@ -342,27 +343,43 @@ fn run_algos_unit<R: Runtime, MP: MatmulPrecision>() {
         })),
     );
 
-    println!("Simple Unit Max");
+    // println!("Simple Unit Max");
+    // run::<R, MP>(
+    //     Default::default(),
+    //     Strategy::SimpleUnit(BlueprintStrategy::Inferred(SimpleUnitSelectionArgs {
+    //         tile_size: TileSizeSelection::MaxTileSize,
+    //     })),
+    // );
+
+    // println!("Double Unit Min");
+    // run::<R, MP>(
+    //     Default::default(),
+    //     Strategy::DoubleUnit(BlueprintStrategy::Inferred(DoubleUnitSelectionArgs {
+    //         tile_size: TileSizeSelection::MinTileSize,
+    //     })),
+    // );
+
+    // println!("Double Unit Max");
+    // run::<R, MP>(
+    //     Default::default(),
+    //     Strategy::DoubleUnit(BlueprintStrategy::Inferred(DoubleUnitSelectionArgs {
+    //         tile_size: TileSizeSelection::MaxTileSize,
+    //     })),
+    // );
+
+    println!("Interleaved Deferred");
     run::<R, MP>(
         Default::default(),
-        Strategy::SimpleUnit(BlueprintStrategy::Inferred(SimpleUnitSelectionArgs {
-            tile_size: TileSizeSelection::MaxTileSize,
+        Strategy::InterleavedDeferred(BlueprintStrategy::Inferred(InterleavedArgs {
+            multi_rows: true,
         })),
     );
 
-    println!("Double Unit Min");
+    println!("Interleaved Eager");
     run::<R, MP>(
         Default::default(),
-        Strategy::DoubleUnit(BlueprintStrategy::Inferred(DoubleUnitSelectionArgs {
-            tile_size: TileSizeSelection::MinTileSize,
-        })),
-    );
-
-    println!("Double Unit Max");
-    run::<R, MP>(
-        Default::default(),
-        Strategy::DoubleUnit(BlueprintStrategy::Inferred(DoubleUnitSelectionArgs {
-            tile_size: TileSizeSelection::MaxTileSize,
+        Strategy::InterleavedEager(BlueprintStrategy::Inferred(InterleavedArgs {
+            multi_rows: true,
         })),
     );
 }
@@ -453,5 +470,5 @@ fn run_benches<R: Runtime, MP: MatmulPrecision>() {
 }
 
 fn main() {
-    run_benches::<cubecl::TestRuntime, half::f16>();
+    run_benches::<cubecl::TestRuntime, f32>();
 }

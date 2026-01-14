@@ -17,7 +17,9 @@ mod double_buffering {
 // TODO not really a unit matmul, should refactor test suite
 mod interleaved {
     use super::*;
-    type Algorithm = cubek_matmul::routines::interleaved::InterleavedAlgorithm;
+    use cubek_matmul::components::tile::interleaved_deferred::InterleavedDeferredMatmul;
+    type Algorithm =
+        cubek_matmul::routines::interleaved::InterleavedAlgorithm<InterleavedDeferredMatmul>;
 
     include!("precision.rs");
 }

@@ -1,3 +1,26 @@
+mod g8x8x8 {
+    use super::*;
+    use cubek_matmul::definition::MatmulProblem;
+
+    fn problem() -> MatmulProblem {
+        let layouts = layouts();
+
+        MatmulProblem::from_parameters(
+            8,
+            8,
+            8,
+            vec![1],
+            vec![1],
+            layouts.0,
+            layouts.1,
+            MatrixLayout::RowMajor,
+            elems(),
+        )
+    }
+
+    include!("../launch.rs");
+}
+
 mod g16x8x16 {
     use super::*;
     use cubek_matmul::definition::MatmulProblem;

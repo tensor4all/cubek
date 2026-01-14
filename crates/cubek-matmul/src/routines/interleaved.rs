@@ -6,6 +6,7 @@ use std::marker::PhantomData;
 use crate::components::batch::BatchMatmulFamily;
 use crate::components::tile::interleaved_deferred::InterleavedDeferredMatmul;
 use crate::components::tile::interleaved_eager::InterleavedEagerMatmul;
+use crate::components::tile::io::{Filled, Strided};
 use crate::definition::{
     CubeCountStrategy, GlobalOrderStrategy, HypercubeBlueprint, MatmulElems, MatmulLineSizes,
     MatmulProblem, MatmulSetupError, MultiRowStrategy, SmAllocation, TilingBlueprint, TilingScheme,
@@ -34,9 +35,11 @@ use crate::{
 
 /// Plane accelerated single stage matmul with configurable readers (default to cyclic)
 pub struct InterleavedAlgorithm<
+    TMM: TileMatmulFamily,
     LL = SyncFullCyclicLoading<ColMajorTilingOrder>,
     RL = SyncFullCyclicLoading<RowMajorTilingOrder>,
 > {
+    pub _tmm: PhantomData<TMM>,
     pub _ll: PhantomData<LL>,
     pub _rl: PhantomData<RL>,
 }
@@ -53,21 +56,17 @@ impl Display for InterleavedArgs {
     }
 }
 
-impl<LL, RL> Routine for InterleavedAlgorithm<LL, RL>
+impl<TMM: TileMatmulFamily, LL, RL> Routine for InterleavedAlgorithm<TMM, LL, RL>
 where
     LL: FullLoadingStrategy,
     RL: FullLoadingStrategy<SyncStrategy = LL::SyncStrategy>,
+    TMM:
+        TileMatmulFamily<LhsTile = Strided, RhsTile = Strided, AccTile = Filled, OutTile = Strided>,
 {
     type Strategy = InterleavedArgs;
     type BatchMatmul = PartitionedBatchMatmulFamily<
         SimpleMatmulFamily<
-            PlaneMatmulFamily<
-                // InterleavedDeferredMatmul,
-                InterleavedEagerMatmul,
-                StridedStageFamily,
-                StridedStageFamily,
-                FilledStageFamily,
-            >,
+            PlaneMatmulFamily<TMM, StridedStageFamily, StridedStageFamily, FilledStageFamily>,
             LL,
             RL,
             PlaneWriterFamily,
@@ -148,19 +147,6 @@ fn infer_blueprint_multi_rows<R: Runtime, TMM: TileMatmulFamily>(
 ) -> Result<(TilingBlueprint, MatmulElems), MatmulSetupError> {
     adjust_dtypes(client, &mut dtypes, TMM::requires_accelerator());
 
-    let supported = |m: u32, n: u32, k: u32| {
-        TMM::is_supported(
-            client,
-            MmaConfig {
-                a_type: dtypes.lhs_register,
-                b_type: dtypes.rhs_register,
-                cd_type: dtypes.acc_register,
-                m,
-                n,
-                k,
-            },
-        )
-    };
     let cube_count_strategy = match client.properties().hardware.num_streaming_multiprocessors {
         Some(num_sms) => CubeCountStrategy::Sm {
             num_sms,
@@ -170,66 +156,26 @@ fn infer_blueprint_multi_rows<R: Runtime, TMM: TileMatmulFamily>(
         None => CubeCountStrategy::Flattened,
     };
 
-    if supported(8, 32, 16) {
-        // A lot of multi-rows balanced with a
-        // tile size of (8, 32, 16)
-        let tiling_scheme = TilingScheme::builder()
-            .with_tile_size((8, 32, 16).into())
-            .with_partition_size((4, 4, 2).into())
-            .with_stage_size((4, 1, 1).into())
-            .build()
-            .unwrap();
+    let tiling_scheme = TilingScheme::builder()
+        .with_tile_size((4, 4, 32).into())
+        .with_partition_size((1, 1, 1).into())
+        .with_stage_size((4, 4, 1).into())
+        .build()
+        .unwrap();
 
-        let hypercube = HypercubeBlueprint::builder(&tiling_scheme)
-            .global_order_strategy(GlobalOrderStrategy::SwizzleRow {
-                m: problem.m as u32,
-                w: 4,
-            })
-            .cube_count_strategy(cube_count_strategy)
-            .build();
+    let hypercube = HypercubeBlueprint::builder(&tiling_scheme)
+        .global_order_strategy(GlobalOrderStrategy::SwizzleRow {
+            m: problem.m as u32,
+            w: 4,
+        })
+        .cube_count_strategy(cube_count_strategy)
+        .build();
 
-        Ok((
-            TilingBlueprint::builder(tiling_scheme, plane_dim, problem)
-                .partition_buffering(PartitionBuffering::Single)
-                .hypercube_blueprint(hypercube)
-                .build(),
-            dtypes,
-        ))
-    } else if supported(8, 8, 8) {
-        let tiling_scheme = TilingScheme::builder()
-            .with_tile_size((8, 8, 8).into())
-            .with_partition_size((4, 8, 2).into())
-            .with_stage_size((4, 1, 1).into())
-            .build()
-            .unwrap();
-        let hypercube = HypercubeBlueprint::builder(&tiling_scheme)
-            .global_order_strategy(GlobalOrderStrategy::SwizzleRow {
-                m: problem.m as u32,
-                w: 4,
-            })
-            .cube_count_strategy(cube_count_strategy)
-            .build();
-
-        Ok((
-            TilingBlueprint::builder(tiling_scheme, plane_dim, problem)
-                .partition_buffering(PartitionBuffering::Single)
-                .hypercube_blueprint(hypercube)
-                .build(),
-            dtypes,
-        ))
-    } else {
-        infer_blueprint_plane::<TMM, R>(
-            client,
-            problem,
-            plane_dim,
-            dtypes,
-            line_sizes,
-            PlaneTilingBlueprintOptions {
-                partition_buffering: Some(PartitionBuffering::Single),
-                multi_row_strategy: MultiRowStrategy::Always(2),
-                partition_k: Some(2),
-                ..Default::default()
-            },
-        )
-    }
+    Ok((
+        TilingBlueprint::builder(tiling_scheme, plane_dim, problem)
+            .partition_buffering(PartitionBuffering::Single)
+            .hypercube_blueprint(hypercube)
+            .build(),
+        dtypes,
+    ))
 }
