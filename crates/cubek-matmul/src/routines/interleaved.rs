@@ -1,15 +1,12 @@
-use cubecl::features::MmaConfig;
 use cubecl::{Runtime, client::ComputeClient};
 use std::fmt::Display;
 use std::marker::PhantomData;
 
 use crate::components::batch::BatchMatmulFamily;
-use crate::components::tile::interleaved_deferred::InterleavedDeferredMatmul;
-use crate::components::tile::interleaved_eager::InterleavedEagerMatmul;
 use crate::components::tile::io::{Filled, Strided};
 use crate::definition::{
     CubeCountStrategy, GlobalOrderStrategy, HypercubeBlueprint, MatmulElems, MatmulLineSizes,
-    MatmulProblem, MatmulSetupError, MultiRowStrategy, SmAllocation, TilingBlueprint, TilingScheme,
+    MatmulProblem, MatmulSetupError, MatrixLayout, SmAllocation, TilingBlueprint, TilingScheme,
     adjust_dtypes,
 };
 use crate::routines::{BlueprintStrategy, DeviceSettings, LaunchInfo};
@@ -27,10 +24,7 @@ use crate::{
         },
         tile::TileMatmulFamily,
     },
-    routines::{
-        Routine,
-        selector::{PlaneTilingBlueprintOptions, infer_blueprint_plane},
-    },
+    routines::Routine,
 };
 
 /// Plane accelerated single stage matmul with configurable readers (default to cyclic)
@@ -45,14 +39,11 @@ pub struct InterleavedAlgorithm<
 }
 
 #[derive(Default, Debug, Clone)]
-pub struct InterleavedArgs {
-    // Uses an optimized multi rows strategy.
-    pub multi_rows: bool,
-}
+pub struct InterleavedArgs {}
 
 impl Display for InterleavedArgs {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(if self.multi_rows { "_multi_rows" } else { "" })
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Ok(())
     }
 }
 
@@ -83,38 +74,20 @@ where
     ) -> Result<LaunchInfo<TilingBlueprint>, MatmulSetupError> {
         let mut dtypes = MatmulElems::from_globals(&problem.global_dtypes);
 
-        if InterleavedDeferredMatmul::can_cast_stage_element() {
+        if TMM::can_cast_stage_element() {
             dtypes.adjust_stage_dtypes();
         }
 
         let client = &device_settings.client;
         let (blueprint, dtypes) = match strategy {
             BlueprintStrategy::Forced(blueprint) => (blueprint.clone(), dtypes),
-            BlueprintStrategy::Inferred(strategy) => {
-                if strategy.multi_rows {
-                    infer_blueprint_multi_rows::<R, InterleavedDeferredMatmul>(
-                        client,
-                        problem,
-                        device_settings.plane_dim,
-                        dtypes,
-                        &device_settings.line_sizes,
-                    )
-                } else {
-                    infer_blueprint_plane::<InterleavedDeferredMatmul, R>(
-                        client,
-                        problem,
-                        device_settings.plane_dim,
-                        dtypes,
-                        &device_settings.line_sizes,
-                        PlaneTilingBlueprintOptions {
-                            partition_buffering: Some(PartitionBuffering::Single),
-                            tiny_selection_enabled: true,
-                            swizzled: InterleavedDeferredMatmul::should_swizzle(client),
-                            ..Default::default()
-                        },
-                    )
-                }?
-            }
+            BlueprintStrategy::Inferred(_) => infer_blueprint_multi_rows::<R, TMM>(
+                client,
+                problem,
+                device_settings.plane_dim,
+                dtypes,
+                &device_settings.line_sizes,
+            )?,
         };
 
         Self::validate_blueprint(
@@ -156,10 +129,30 @@ fn infer_blueprint_multi_rows<R: Runtime, TMM: TileMatmulFamily>(
         None => CubeCountStrategy::Flattened,
     };
 
+    let tile_m = match problem.lhs_layout {
+        MatrixLayout::RowMajor => 1,
+        MatrixLayout::ColMajor => line_sizes.lhs,
+    };
+
+    let tile_n = match problem.rhs_layout {
+        MatrixLayout::RowMajor => line_sizes.rhs,
+        MatrixLayout::ColMajor => line_sizes.out,
+    };
+
+    let tile_k = plane_dim as usize
+        * if matches!(problem.lhs_layout, MatrixLayout::RowMajor)
+            || matches!(problem.rhs_layout, MatrixLayout::ColMajor)
+        {
+            assert!(line_sizes.lhs == line_sizes.rhs);
+            line_sizes.lhs
+        } else {
+            1
+        };
+
     let tiling_scheme = TilingScheme::builder()
-        .with_tile_size((4, 4, 32).into())
-        .with_partition_size((1, 1, 1).into())
-        .with_stage_size((4, 4, 1).into())
+        .with_tile_size((tile_m, tile_n, tile_k).into())
+        .with_partition_size((4, 1, 1).into())
+        .with_stage_size((1, 4, 1).into())
         .build()
         .unwrap();
 

@@ -295,12 +295,14 @@ impl Display for Strategy {
             Strategy::DoubleVecMat(blueprint_strategy) => {
                 f.write_fmt(format_args!("matmul_double_vecmat{}", blueprint_strategy))
             }
-            Strategy::InterleavedDeferred(blueprint_strategy) => {
-                f.write_str("matmul_interleaved_deferred{}")
-            }
-            Strategy::InterleavedEager(blueprint_strategy) => {
-                f.write_str("matmul_interleaved_eager{}")
-            }
+            Strategy::InterleavedDeferred(blueprint_strategy) => f.write_fmt(format_args!(
+                "matmul_interleaved_deferred{}",
+                blueprint_strategy
+            )),
+            Strategy::InterleavedEager(blueprint_strategy) => f.write_fmt(format_args!(
+                "matmul_interleaved_eager{}",
+                blueprint_strategy
+            )),
             Strategy::Naive => f.write_str("matmul_naive"),
             Strategy::Auto => f.write_str("matmul_auto"),
         }

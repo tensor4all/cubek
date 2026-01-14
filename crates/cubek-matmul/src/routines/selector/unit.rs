@@ -554,9 +554,7 @@ fn selection(
         })
     }
 
-    let x = builder.build();
-    println!("{:?}", x);
-    x
+    builder.build()
 }
 
 /// All modes currently use atom size 16

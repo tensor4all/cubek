@@ -343,44 +343,34 @@ fn run_algos_unit<R: Runtime, MP: MatmulPrecision>() {
         })),
     );
 
-    // println!("Simple Unit Max");
-    // run::<R, MP>(
-    //     Default::default(),
-    //     Strategy::SimpleUnit(BlueprintStrategy::Inferred(SimpleUnitSelectionArgs {
-    //         tile_size: TileSizeSelection::MaxTileSize,
-    //     })),
-    // );
+    println!("Simple Unit Max");
+    run::<R, MP>(
+        Default::default(),
+        Strategy::SimpleUnit(BlueprintStrategy::Inferred(SimpleUnitSelectionArgs {
+            tile_size: TileSizeSelection::MaxTileSize,
+        })),
+    );
 
-    // println!("Double Unit Min");
-    // run::<R, MP>(
-    //     Default::default(),
-    //     Strategy::DoubleUnit(BlueprintStrategy::Inferred(DoubleUnitSelectionArgs {
-    //         tile_size: TileSizeSelection::MinTileSize,
-    //     })),
-    // );
+    println!("Double Unit Min");
+    run::<R, MP>(
+        Default::default(),
+        Strategy::DoubleUnit(BlueprintStrategy::Inferred(DoubleUnitSelectionArgs {
+            tile_size: TileSizeSelection::MinTileSize,
+        })),
+    );
 
-    // println!("Double Unit Max");
-    // run::<R, MP>(
-    //     Default::default(),
-    //     Strategy::DoubleUnit(BlueprintStrategy::Inferred(DoubleUnitSelectionArgs {
-    //         tile_size: TileSizeSelection::MaxTileSize,
-    //     })),
-    // );
+    println!("Double Unit Max");
+    run::<R, MP>(
+        Default::default(),
+        Strategy::DoubleUnit(BlueprintStrategy::Inferred(DoubleUnitSelectionArgs {
+            tile_size: TileSizeSelection::MaxTileSize,
+        })),
+    );
 
     println!("Interleaved Deferred");
     run::<R, MP>(
         Default::default(),
-        Strategy::InterleavedDeferred(BlueprintStrategy::Inferred(InterleavedArgs {
-            multi_rows: true,
-        })),
-    );
-
-    println!("Interleaved Eager");
-    run::<R, MP>(
-        Default::default(),
-        Strategy::InterleavedEager(BlueprintStrategy::Inferred(InterleavedArgs {
-            multi_rows: true,
-        })),
+        Strategy::InterleavedDeferred(BlueprintStrategy::Inferred(InterleavedArgs {})),
     );
 }
 
