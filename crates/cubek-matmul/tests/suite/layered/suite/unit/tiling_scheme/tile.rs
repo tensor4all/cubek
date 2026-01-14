@@ -85,3 +85,14 @@ mod t4x8x32 {
 
     include!("partition.rs");
 }
+
+mod t1x8x256 {
+    use super::*;
+    use cubek_matmul::definition::{TileSize, TilingScheme, TilingSchemeBuilder};
+
+    fn tile_size(builder: TilingSchemeBuilder) -> TilingSchemeBuilder {
+        builder.with_tile_size(TileSize { m: 1, n: 8, k: 256 })
+    }
+
+    include!("partition.rs");
+}

@@ -11,8 +11,8 @@ use crate::{
         },
         stage::{ColMajorTilingOrder, RowMajorTilingOrder},
         tile::{
-            cmma::CmmaMatmul, interleaved_deferred::InterleavedDeferredMatmul,
-            interleaved_eager::InterleavedEagerMatmul, io::Filled, mma::MmaMatmul,
+            cmma::CmmaMatmul, interleaved_deferred::InterleavedDeferredMatmul, io::Filled,
+            mma::MmaMatmul,
         },
     },
     definition::{MatmulElems, MatmulSetupError},
@@ -150,7 +150,6 @@ pub enum Strategy {
     SimpleVecMat(BlueprintStrategy<SimpleVecMatAlgorithm>),
     DoubleVecMat(BlueprintStrategy<DoubleVecMatAlgorithm>),
     InterleavedDeferred(BlueprintStrategy<InterleavedAlgorithm<InterleavedDeferredMatmul>>),
-    InterleavedEager(BlueprintStrategy<InterleavedAlgorithm<InterleavedEagerMatmul>>),
     Naive,
     #[default]
     Auto,
@@ -299,10 +298,6 @@ impl Display for Strategy {
                 "matmul_interleaved_deferred{}",
                 blueprint_strategy
             )),
-            Strategy::InterleavedEager(blueprint_strategy) => f.write_fmt(format_args!(
-                "matmul_interleaved_eager{}",
-                blueprint_strategy
-            )),
             Strategy::Naive => f.write_str("matmul_naive"),
             Strategy::Auto => f.write_str("matmul_auto"),
         }
@@ -429,9 +424,6 @@ impl Strategy {
                 launch_tiling::launch_ref(client, lhs, rhs, out, selection, dtypes)
             }
             Strategy::InterleavedDeferred(selection) => {
-                launch_tiling::launch_ref(client, lhs, rhs, out, selection, dtypes)
-            }
-            Strategy::InterleavedEager(selection) => {
                 launch_tiling::launch_ref(client, lhs, rhs, out, selection, dtypes)
             }
             Strategy::Naive => launch_naive::launch_ref(client, lhs, rhs, out, dtypes),
