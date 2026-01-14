@@ -1,6 +1,8 @@
 use crate::components::tile::StridedTile;
 use crate::components::tile::interleaved_deferred::config::InterleavedDeferredMatmulConfig;
-use crate::components::tile::interleaved_deferred::{InterleavedDeferredAccumulator, InterleavedDeferredFragment};
+use crate::components::tile::interleaved_deferred::{
+    InterleavedDeferredAccumulator, InterleavedDeferredFragment,
+};
 use crate::definition::{MatrixLayout, StageIdent};
 use cubecl::prelude::*;
 
