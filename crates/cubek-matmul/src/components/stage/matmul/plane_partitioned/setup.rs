@@ -116,7 +116,7 @@ impl<
             partitions_per_stage_along_col: blueprint.tiling_scheme.stage_size.n as u32,
             // TODO be restricted from tile matmul
             // line_size: line_sizes.out as u32,
-            line_size: 1 as u32,
+            line_size: 1_u32,
             matrix_layout: MatrixLayout::RowMajor,
             swizzle: blueprint.swizzle_modes.out,
             num_stages: 1,
