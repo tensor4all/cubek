@@ -11,7 +11,7 @@ edition = "2024"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 rust-version = "1.88"
-version = "0.1.0"
+version = "0.1.1"
 
 [workspace.dependencies]
 ### For local development. ###
@@ -23,8 +23,8 @@ version = "0.1.0"
 # cubecl-common = { git = "https://github.com/tracel-ai/cubecl", rev = "d060bfd58126b790ea0f9794dd3b3d791eb74fd6", default-features = false }
 
 ### For releases ###
-cubecl = { version = "=0.9.0", default-features = false }
-cubecl-common = { version = "=0.9.0", default-features = false }
+cubecl = { version = "0.9.0", default-features = false }
+cubecl-common = { version = "0.9.0", default-features = false }
 
 bitflags = { version = "2.9.1", features = ["serde"] }
 derive-new = { version = "0.7.0", default-features = false }
