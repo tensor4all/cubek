@@ -1,10 +1,10 @@
 use cubecl::{
-    features::TypeUsage,
+    features::AtomicUsage,
     std::tensor::layout::linear::{
         LinearView, LinearViewLaunch, LinearViewLayout, LinearViewLayoutLaunch,
     },
 };
-use cubecl::{ir::ElemType, std::tensor::layout::linear::linear_view};
+use cubecl::{ir::ElemType, ir::Type, std::tensor::layout::linear::linear_view};
 use cubecl::{prelude::*, tensor_vector_size_parallel};
 
 use crate::ReduceError;
@@ -67,8 +67,8 @@ pub fn shared_sum<R: Runtime>(
     // Check that the client supports atomic addition.
     if !client
         .properties()
-        .type_usage(StorageType::Atomic(input_elem))
-        .contains(TypeUsage::AtomicAdd)
+        .atomic_type_usage(Type::scalar(input_elem))
+        .contains(AtomicUsage::Add)
     {
         return Err(ReduceError::MissingAtomicAdd(input_elem.into()));
     }
