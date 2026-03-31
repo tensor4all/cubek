@@ -52,7 +52,7 @@ pub fn test_very_small_square_rhs_row_major() {
         k: 128,
         lhs_batch: 1,
         rhs_batch: 1,
-        rhs_layout: MatrixLayout::RowMajor,
+        rhs_layout: MatrixLayout::ColMajor,
         elems: elems(),
     };
 
@@ -66,7 +66,7 @@ pub fn test_k_larger_than_n() {
         k: 256,
         lhs_batch: 1,
         rhs_batch: 1,
-        rhs_layout: MatrixLayout::RowMajor,
+        rhs_layout: MatrixLayout::ColMajor,
         elems: elems(),
     };
 
@@ -80,7 +80,7 @@ pub fn test_k_smaller_than_n() {
         k: 128,
         lhs_batch: 1,
         rhs_batch: 1,
-        rhs_layout: MatrixLayout::RowMajor,
+        rhs_layout: MatrixLayout::ColMajor,
         elems: elems(),
     };
 
@@ -94,7 +94,7 @@ pub fn test_small_square_rhs_row_major() {
         k: 256,
         lhs_batch: 1,
         rhs_batch: 1,
-        rhs_layout: MatrixLayout::RowMajor,
+        rhs_layout: MatrixLayout::ColMajor,
         elems: elems(),
     };
 
@@ -108,7 +108,7 @@ pub fn test_large() {
         k: 1280,
         lhs_batch: 1,
         rhs_batch: 1,
-        rhs_layout: MatrixLayout::RowMajor,
+        rhs_layout: MatrixLayout::ColMajor,
         elems: elems(),
     };
 
@@ -122,7 +122,7 @@ pub fn test_large_broadcast_lhs() {
         k: 1280,
         lhs_batch: 1,
         rhs_batch: 2,
-        rhs_layout: MatrixLayout::RowMajor,
+        rhs_layout: MatrixLayout::ColMajor,
         elems: elems(),
     };
 
@@ -136,7 +136,7 @@ pub fn test_large_broadcast_rhs() {
         k: 1280,
         lhs_batch: 2,
         rhs_batch: 1,
-        rhs_layout: MatrixLayout::RowMajor,
+        rhs_layout: MatrixLayout::ColMajor,
         elems: elems(),
     };
 
@@ -150,7 +150,7 @@ pub fn test_large_broadcast_batched() {
         k: 1280,
         lhs_batch: 2,
         rhs_batch: 2,
-        rhs_layout: MatrixLayout::RowMajor,
+        rhs_layout: MatrixLayout::ColMajor,
         elems: elems(),
     };
 
@@ -164,7 +164,7 @@ pub fn test_uneven_shape() {
         k: 29,
         lhs_batch: 1,
         rhs_batch: 1,
-        rhs_layout: MatrixLayout::RowMajor,
+        rhs_layout: MatrixLayout::ColMajor,
         elems: elems(),
     };
 
@@ -178,7 +178,7 @@ pub fn test_not_same_vectorization() {
         k: 32,
         lhs_batch: 1,
         rhs_batch: 1,
-        rhs_layout: MatrixLayout::RowMajor,
+        rhs_layout: MatrixLayout::ColMajor,
         elems: elems(),
     };
 

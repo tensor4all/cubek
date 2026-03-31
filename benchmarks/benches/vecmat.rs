@@ -7,13 +7,14 @@ use cubecl::{
 use cubek::{
     matmul::{
         definition::MatmulElems,
-        launch::{InputBinding, Strategy, launch_ref},
+        launch::{Strategy, launch_ref},
         routines::{
             BlueprintStrategy, TileSizeSelection, nostage_vecmat::NoStageVecMatStrategy,
             simple_unit::SimpleUnitSelectionArgs,
         },
     },
     random::random_uniform,
+    std::InputBinding,
 };
 
 #[allow(dead_code)]
@@ -44,11 +45,16 @@ impl<R: Runtime> Benchmark for VecMatBench<R> {
         let lhs = TensorHandle::empty(&client, [self.batches, 1, self.k], self.dtypes.lhs_global);
         random_uniform(&client, 0., 1., lhs.clone().binding(), lhs.dtype).unwrap();
 
-        let rhs = TensorHandle::empty(
+        let mut rhs = TensorHandle::empty(
             &client,
-            [self.batches, self.k, self.n],
+            [self.batches, self.n, self.k],
             self.dtypes.rhs_global,
         );
+        if true {
+            let len = rhs.metadata.rank();
+            rhs.metadata.strides_mut().swap(len - 2, len - 1);
+            rhs.metadata.shape_mut().swap(len - 2, len - 1);
+        }
         random_uniform(&client, 0., 1., rhs.clone().binding(), rhs.dtype).unwrap();
 
         let out = TensorHandle::empty(&client, [self.batches, 1, self.n], self.dtypes.acc_global);
@@ -83,8 +89,8 @@ fn run<R: Runtime, E: frontend::Float>(device: &R::Device, strategy: Strategy) {
 
     let bench = VecMatBench::<R> {
         client: client.clone(),
-        batches: 2,
-        n: 4096,
+        batches: 1,
+        n: 1024,
         k: 8192,
         device: device.clone(),
         dtypes: MatmulElems::from_single_dtype(E::as_type_native_unchecked()),

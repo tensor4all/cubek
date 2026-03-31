@@ -126,16 +126,18 @@ impl<MP: MatmulTypes> BatchMatmul<(), MP> for NoStageVecMat<MP> {
         let plane_id = UNIT_POS_Y;
         let unit_id = UNIT_POS_X;
 
-        let tile_size = plane_dim * vector_size;
+        // First, we load a 32*8 segment of lhs
+        // Then a 32*8 column segment of rhs
+        // Then it's simply an element wise multiplication
+        // Yielding 32*8 accumulators of 1 element
+        // Which at the end are FIRST vector summed, then scalar plane summed
+        // This is for one k
+        // Then we can send one plane per k
+
         let absolute_plane_id = n_cube_id * num_planes + plane_id;
-        let unit_pos_n = absolute_plane_id * plane_dim + unit_id;
-        let vectorized_pos_n = unit_pos_n * vector_size;
 
-        // TODO mask if within plane
-        if vectorized_pos_n >= n {
-            terminate!();
-        }
-
+        // Tile = 1d vector of plane_dim * vector_size
+        let tile_size = plane_dim * vector_size;
         let num_tiles = k / tile_size;
 
         let mut acc = Vector::<AccR<MP>, NA>::zero();
@@ -144,21 +146,24 @@ impl<MP: MatmulTypes> BatchMatmul<(), MP> for NoStageVecMat<MP> {
             let swizzled_tile_index = (tile_index + plane_id) % num_tiles;
             let k_base = swizzled_tile_index * plane_dim;
 
-            let local_lhs_vec = lhs.read_checked((0, (k_base + unit_id) * vector_size));
+            let lhs_vec = lhs.read_checked((0, (k_base + unit_id) * vector_size));
+            let rhs_vec = rhs.read_checked(((k_base + unit_id) * vector_size, absolute_plane_id));
 
-            for plane_iter in 0..plane_dim {
-                let lhs_vec = shuffle(local_lhs_vec, plane_iter, plane_dim);
-                let rhs_k_vec_base = (k_base + plane_iter) * vector_size;
-
-                for vec_iter in 0..NA::value() as u32 {
-                    let lhs_scalar = lhs_vec[vec_iter as usize];
-                    let rhs_vec = rhs.read_checked((rhs_k_vec_base + vec_iter, vectorized_pos_n));
-                    acc += Vector::cast_from(lhs_scalar) * Vector::cast_from(rhs_vec);
-                }
-            }
+            acc += Vector::cast_from(lhs_vec) * Vector::cast_from(rhs_vec);
         }
 
-        out.write_checked((0, vectorized_pos_n), Vector::cast_from(acc));
+        let mut sum = AccR::<MP>::zero();
+
+        #[unroll]
+        for i in 0..NA::value() {
+            sum += acc[i];
+        }
+
+        let sum = plane_sum(sum);
+
+        if unit_id == 0 {
+            out.write_checked((0, absolute_plane_id), Vector::cast_from(sum));
+        }
     }
 }
 
