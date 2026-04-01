@@ -85,7 +85,7 @@ impl<R: Runtime> Benchmark for VecMatBench<R> {
 
 #[allow(dead_code)]
 fn run<R: Runtime, E: frontend::Float>(device: &R::Device, strategy: Strategy) {
-    let client = R::client(&device);
+    let client = R::client(device);
 
     let bench = VecMatBench::<R> {
         client: client.clone(),
