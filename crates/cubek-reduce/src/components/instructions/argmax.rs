@@ -38,7 +38,18 @@ impl ReduceFamily for ArgMax {
 
 #[cube]
 impl<P: ReducePrecision> ReduceInstruction<P> for ArgMax {
+    // Parallel: pas clair
+    // associatif: a·(b·c) = (a·b)·c
+    // commutatif: a·b = b·a
+    // on ne veut pas que l'accumulateur soit vectorisé (ou peut être size=1)
+    // -> Faire le travail séquentiellement sur chaque élément du vecteur
+    // Perpendiculaire: 
+    // - La vectorisation est perpendiculaire à l'axe de réduction
+    // - On fait P::SI fois le travail de manière indépendante
+
+    // SHORT TERM: scalaire i.e. P::SI = 1
     type AccumulatorItem = (Vector<P::EA, P::SI>, Vector<u32, P::SI>);
+    // (SharedMemory<Array<Vector<P::EA, P::SI>>>, SharedMemory<Array<u32>>)
     type SharedAccumulator = ArgAccumulator<P::EA, P::SI>;
     type Config = ();
 
@@ -51,6 +62,7 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ArgMax {
     }
 
     fn null_input(_this: &Self) -> Vector<P::EI, P::SI> {
+        // k fois min value dans un array
         Vector::new(P::EI::min_value())
     }
 
@@ -63,6 +75,10 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ArgMax {
         destination: &mut Self::AccumulatorItem,
         source: &Self::AccumulatorItem,
     ) {
+        // Accumulateur: 5 éléments, nouvelle valeur: 1 élément
+
+        // SHORT TERM: accept deep copy
+        // maybe need iterate on array (deep copy)
         destination.0 = source.0;
         destination.1 = source.1;
     }
@@ -84,6 +100,13 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ArgMax {
         coordinate: ReduceCoordinate<P::SI>,
         #[comptime] use_planes: bool,
     ) -> Self::AccumulatorItem {
+        // tu recois item (1 élément) 7
+        // tu as accumulator (5 élément) qui est assumé trié
+        // Top (max): accumulator = [10,8,6,4,2]
+        // for i in 0..acc.len
+        // acc[i] = max(acc[i], item)
+        // item = min(acc[i] d'avant, item) (variable tmp)
+
         #[comptime]
         let coordinate = match coordinate {
             ReduceCoordinate::Required(val) => val,

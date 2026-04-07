@@ -50,15 +50,20 @@ pub(crate) fn launch_reduce<Run: Runtime>(
         1 => VectorizationMode::Parallel,
         _ => VectorizationMode::Perpendicular,
     };
-    let (vector_size_input, vector_size_output) = generate_vector_size::<Run>(
-        client,
-        &input,
-        &output,
-        axis,
-        problem.dtypes.input,
-        vectorization_mode,
-        &strategy.vectorization,
-    );
+    let (vector_size_input, vector_size_output) = if let ReduceOperationConfig::TopK = inst {
+        (1, 1)
+    } else {
+        generate_vector_size::<Run>(
+            client,
+            &input,
+            &output,
+            axis,
+            problem.dtypes.input,
+            vectorization_mode,
+            &strategy.vectorization,
+        )
+    };
+
     let settings = ReduceVectorSettings {
         vectorization_mode,
         vector_size_input,
