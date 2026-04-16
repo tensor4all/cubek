@@ -26,7 +26,13 @@ impl<P: ReducePrecision> Reader<P> {
         idle: ComptimeOption<bool>,
         #[comptime] bound_checks: BoundChecks,
         #[comptime] vectorization_mode: VectorizationMode,
+        #[comptime] plane_dim_ceil: bool,
     ) -> Reader<P> {
+        let effective_plane_dim = if plane_dim_ceil {
+            min(CUBE_DIM_X, PLANE_DIM)
+        } else {
+            CUBE_DIM_X
+        };
         match vectorization_mode {
             VectorizationMode::Parallel => {
                 Reader::<P>::new_Parallel(ParallelReader::<P>::new::<I, Out>(
@@ -36,6 +42,7 @@ impl<P: ReducePrecision> Reader<P> {
                     reduce_axis,
                     reduce_index,
                     idle,
+                    effective_plane_dim,
                     bound_checks,
                 ))
             }
@@ -47,6 +54,7 @@ impl<P: ReducePrecision> Reader<P> {
                     reduce_axis,
                     reduce_index,
                     idle,
+                    effective_plane_dim,
                     bound_checks,
                 ))
             }

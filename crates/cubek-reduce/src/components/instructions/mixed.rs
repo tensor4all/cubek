@@ -2,7 +2,10 @@ use super::{
     ArgMax, ArgMin, ArgTopK, Max, MaxAbs, Mean, Min, Prod, ReduceCoordinate, ReduceFamily,
     ReduceInstruction, ReduceRequirements, SharedAccumulator, Sum,
 };
-use crate::{ReduceDtypes, components::precision::ReducePrecision};
+use crate::{
+    ReduceDtypes,
+    components::{instructions::ReduceStep, precision::ReducePrecision},
+};
 use cubecl::{
     ir::{ElemType, FloatKind, IntKind, UIntKind},
     prelude::*,
@@ -348,7 +351,7 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ReduceOperation {
         accumulator: &Self::AccumulatorItem,
         item: Vector<P::EI, P::SI>,
         coordinate: ReduceCoordinate<P::SI>,
-        #[comptime] use_planes: bool,
+        #[comptime] reduce_step: ReduceStep,
     ) -> Self::AccumulatorItem {
         match this {
             ReduceOperation::Sum(sum) => {
@@ -357,7 +360,7 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ReduceOperation {
                     &accumulator.elements,
                     item,
                     coordinate,
-                    use_planes,
+                    reduce_step,
                 );
                 DynamicAccumulatorItem::<P::EA, P::SI> {
                     elements,
@@ -370,7 +373,7 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ReduceOperation {
                     &accumulator.elements,
                     item,
                     coordinate,
-                    use_planes,
+                    reduce_step,
                 );
                 DynamicAccumulatorItem::<P::EA, P::SI> {
                     elements,
@@ -383,7 +386,7 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ReduceOperation {
                     &accumulator.elements,
                     item,
                     coordinate,
-                    use_planes,
+                    reduce_step,
                 );
                 DynamicAccumulatorItem::<P::EA, P::SI> {
                     elements,
@@ -396,7 +399,7 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ReduceOperation {
                     &accumulator.elements,
                     item,
                     coordinate,
-                    use_planes,
+                    reduce_step,
                 );
                 DynamicAccumulatorItem::<P::EA, P::SI> {
                     elements,
@@ -409,7 +412,7 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ReduceOperation {
                     &(accumulator.elements, accumulator.args.unwrap()),
                     item,
                     coordinate,
-                    use_planes,
+                    reduce_step,
                 );
 
                 DynamicAccumulatorItem::<P::EA, P::SI> {
@@ -423,7 +426,7 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ReduceOperation {
                     &(accumulator.elements, accumulator.args.unwrap()),
                     item,
                     coordinate,
-                    use_planes,
+                    reduce_step,
                 );
 
                 DynamicAccumulatorItem::<P::EA, P::SI> {
@@ -437,7 +440,7 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ReduceOperation {
                     &(accumulator.elements, accumulator.args.unwrap()),
                     item,
                     coordinate,
-                    use_planes,
+                    reduce_step,
                 );
 
                 DynamicAccumulatorItem::<P::EA, P::SI> {
@@ -451,7 +454,7 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ReduceOperation {
                     &accumulator.elements,
                     item,
                     coordinate,
-                    use_planes,
+                    reduce_step,
                 );
                 DynamicAccumulatorItem::<P::EA, P::SI> {
                     elements,
@@ -464,7 +467,7 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ReduceOperation {
                     &accumulator.elements,
                     item,
                     coordinate,
-                    use_planes,
+                    reduce_step,
                 );
                 DynamicAccumulatorItem::<P::EA, P::SI> {
                     elements,

@@ -2,7 +2,7 @@ use cubecl::{CubeType, cube, prelude::Vector};
 
 use crate::{
     ReduceFamily, ReduceInstruction, ReducePrecision,
-    components::instructions::{ArgAccumulator, ReduceCoordinate, ReduceRequirements},
+    components::instructions::{ArgAccumulator, ReduceCoordinate, ReduceRequirements, ReduceStep},
 };
 use cubecl::frontend::Numeric;
 
@@ -57,7 +57,7 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ArgTopK {
         _accumulator: &Self::AccumulatorItem,
         _item: Vector<P::EI, P::SI>,
         _coordinate: ReduceCoordinate<P::SI>,
-        #[comptime] _use_planes: bool,
+        #[comptime] _reduce_step: ReduceStep,
     ) -> Self::AccumulatorItem {
         todo!("reduce Not implemented")
     }
