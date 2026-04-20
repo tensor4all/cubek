@@ -1,12 +1,16 @@
 use crate::{
     ReduceInstruction, ReducePrecision, VectorizationMode,
-    components::{args::NumericLine, instructions::Accumulator},
+    components::{
+        args::NumericLine,
+        instructions::{Accumulator, AccumulatorFormat, Value, ValueExpand},
+        layout::ReduceOutputLayout,
+    },
 };
 use cubecl::{
     prelude::*,
     std::tensor::{
         View,
-        layout::{Coords1d, plain::PlainLayout},
+        layout::{Coords1d, Coords2d, plain::PlainLayout},
         r#virtual::VirtualTensor,
     },
 };
@@ -29,11 +33,19 @@ impl<Out: NumericLine> Writer<Out> {
         reduce_axis: usize,
         write_index: usize,
         #[comptime] vectorization_mode: VectorizationMode,
+        #[comptime] value_format: AccumulatorFormat,
     ) -> Writer<Out> {
         match vectorization_mode {
-            VectorizationMode::Parallel => Writer::<Out>::new_Parallel(
-                ParallelWriter::<Out>::new::<P>(input, output, reduce_axis, write_index),
-            ),
+            VectorizationMode::Parallel(vectorization_axis) => {
+                Writer::<Out>::new_Parallel(ParallelWriter::<Out>::new::<P>(
+                    input,
+                    output,
+                    reduce_axis,
+                    vectorization_axis,
+                    write_index,
+                    value_format,
+                ))
+            }
             VectorizationMode::Perpendicular => Writer::<Out>::new_Perpendicular(
                 PerpendicularWriter::<Out>::new::<P>(input, output, reduce_axis, write_index),
             ),
@@ -76,10 +88,12 @@ impl<Out: NumericLine> Writer<Out> {
 
 #[derive(CubeType)]
 pub struct ParallelWriter<Out: NumericLine> {
-    output: View<Vector<Out::T, Out::N>, Coords1d, ReadWrite>,
-    buffer: Vector<Out::T, Out::N>,
+    output: View<Vector<Out::T, Out::N>, Coords2d, ReadWrite>,
+    buffer: Value<Vector<Out::T, Out::N>>,
     axis_size: usize,
     write_index: usize,
+    #[cube(comptime)]
+    accumulator_length: usize,
 }
 
 #[cube]
@@ -88,13 +102,24 @@ impl<Out: NumericLine> ParallelWriter<Out> {
         input: &VirtualTensor<P::EI, P::SI>,
         output: &mut VirtualTensor<Out::T, Out::N, ReadWrite>,
         reduce_axis: usize,
+        vectorization_axis: usize,
         write_index: usize,
+        #[comptime] accumulator_format: AccumulatorFormat,
     ) -> ParallelWriter<Out> {
+        let vectorization_axis_shape = output.shape(vectorization_axis);
+
         ParallelWriter::<Out> {
-            output: output.view_mut(PlainLayout::new(output.len())),
-            buffer: Vector::empty(),
+            output: output.view_mut(ReduceOutputLayout::new(
+                vectorization_axis_shape / output.vector_size(),
+                accumulator_format.len(),
+            )),
+            buffer: match accumulator_format {
+                AccumulatorFormat::Single => Value::new_single(Vector::empty()),
+                AccumulatorFormat::Multiple(length) => Value::new_Multiple(Array::new(length)),
+            },
             axis_size: input.shape(reduce_axis),
             write_index,
+            accumulator_length: accumulator_format.len(),
         }
     }
 
@@ -104,22 +129,46 @@ impl<Out: NumericLine> ParallelWriter<Out> {
         accumulator: Accumulator<P>,
         inst: &I,
     ) {
-        let vector = I::merge_vector::<Out::T>(inst, accumulator, self.axis_size);
-        self.buffer[local_index] = vector.item();
+        let out = I::to_output_parallel::<Out::T>(inst, accumulator, self.axis_size);
 
-        // match vector {
-        //     AccumulatorKind::Multiple(array) =>  {// flatten
-        //         }
-        //     AccumulatorKind::Single(_) =>        ;
-        // }
+        match out {
+            Value::Multiple(array) => {
+                for i in 0..self.accumulator_length {
+                    let mut vec = self.buffer.multiple_mut()[i];
+                    vec[local_index] = array[i];
+                    self.buffer.multiple_mut()[i] = vec;
+                }
+            }
+            Value::Single(element) => {
+                self.buffer.item()[local_index] = element.unwrap();
+            }
+            Value::None => {
+                unreachable!()
+            }
+        }
     }
 
     pub fn commit(&mut self) {
-        self.output.write(self.write_index, self.buffer)
+        match &mut self.buffer {
+            Value::Multiple(array) => {
+                for k_iter in 0..self.accumulator_length {
+                    self.output
+                        .write((self.write_index as u32, k_iter as u32), array[k_iter])
+                }
+            }
+            Value::Single(vector) => self
+                .output
+                .write((self.write_index as u32, 0), vector.unwrap()),
+            Value::None => unreachable!(),
+        }
     }
 
     pub fn write_count(&self) -> comptime_type!(VectorSize) {
-        self.buffer.vector_size()
+        match &self.buffer {
+            Value::Multiple(array) => array[0].vector_size(),
+            Value::Single(vector) => vector.unwrap().vector_size(),
+            Value::None => unreachable!(),
+        }
     }
 
     pub fn commit_required(&self) -> comptime_type!(bool) {

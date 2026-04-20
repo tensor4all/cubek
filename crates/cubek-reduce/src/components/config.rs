@@ -1,7 +1,33 @@
+use cubecl::zspace::Strides;
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum VectorizationMode {
-    Parallel,
+    /// The usize is the vectorization axis (i.e. the axis with stride 1 on output write)
+    Parallel(usize),
     Perpendicular,
+}
+
+impl VectorizationMode {
+    pub(crate) fn new_parallel(input_strides: &Strides) -> VectorizationMode {
+        if input_strides.len() < 2 {
+            // The axis of vectorization for input and output are both 0
+            return VectorizationMode::Parallel(0);
+        }
+
+        let mut min1 = (usize::MAX, 0); // (value, index)
+        let mut min2 = (usize::MAX, 0);
+
+        for (i, &s) in input_strides.iter().enumerate() {
+            if s < min1.0 {
+                min2 = min1;
+                min1 = (s, i);
+            } else if s < min2.0 {
+                min2 = (s, i);
+            }
+        }
+
+        VectorizationMode::Parallel(min2.1)
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

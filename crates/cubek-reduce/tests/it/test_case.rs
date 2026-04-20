@@ -138,7 +138,7 @@ impl TestCase {
         );
     }
 
-    pub fn test_argtopk(&self, k: u32) {
+    pub fn test_argtopk(&self, k: usize) {
         let u32_dtype = u32::as_type_native_unchecked().storage_type();
         self.run_reduce_test(
             move |input, axis| reference_argtopk(input, axis, k),
@@ -162,7 +162,8 @@ impl TestCase {
 
         let expected = cast_host_through_dtype(reference(&input_host, axis), output_dtype);
 
-        let output_handle = self.build_output_tensor(&client, output_dtype, &expected.shape);
+        let output_handle =
+            self.build_output_tensor(&client, output_dtype, &expected.shape, &config);
 
         let result = reduce::<TestRuntime>(
             &client,
@@ -209,8 +210,16 @@ impl TestCase {
         client: &cubecl::client::ComputeClient<TestRuntime>,
         output_dtype: StorageType,
         output_shape: &Shape,
+        config: &ReduceOperationConfig,
     ) -> TensorHandle<TestRuntime> {
-        let strides = contiguous_strides(output_shape.as_slice());
+        let axis = self.axis.unwrap();
+        let is_parallel = self.stride[axis] == 1;
+        let strides = match config {
+            ReduceOperationConfig::ArgTopK(k) if is_parallel => {
+                parallel_multiple_output_strides(self.shape.as_slice(), &self.stride, axis, *k)
+            }
+            _ => contiguous_strides(output_shape.as_slice()),
+        };
         TestInput::new(
             client.clone(),
             output_shape.clone(),
@@ -295,6 +304,34 @@ impl TestCase {
 
         data
     }
+}
+
+/// Output strides for multiple accumulators (like argtopk) in parallel mode.
+fn parallel_multiple_output_strides(
+    input_shape: &[usize],
+    input_strides: &[usize],
+    reduce_axis: usize,
+    k: usize,
+) -> Strides {
+    let rank = input_shape.len();
+    let size_r = input_shape[reduce_axis];
+
+    let v = (0..rank)
+        .filter(|&d| d != reduce_axis)
+        .min_by_key(|&d| input_strides[d])
+        .expect("parallel argtopk requires at least 2 axes");
+    let size_v = input_shape[v];
+
+    let mut out = vec![0usize; rank];
+    out[reduce_axis] = size_v;
+    out[v] = 1;
+    for d in 0..rank {
+        if d == reduce_axis || d == v {
+            continue;
+        }
+        out[d] = input_strides[d] * k / size_r;
+    }
+    Strides::new(&out)
 }
 
 fn round_trip_to_f32(data: &[f32], dtype: StorageType) -> Vec<f32> {

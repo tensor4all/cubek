@@ -2,7 +2,7 @@ use crate::{
     BoundChecks, ReduceInstruction, ReducePrecision, VectorizationMode,
     components::{
         args::NumericLine,
-        instructions::{AccumulatorKind, ReduceRequirements},
+        instructions::{ReduceRequirements, Value},
         readers::{parallel::ParallelReader, perpendicular::PerpendicularReader},
     },
 };
@@ -34,7 +34,7 @@ impl<P: ReducePrecision> Reader<P> {
             CUBE_DIM_X
         };
         match vectorization_mode {
-            VectorizationMode::Parallel => {
+            VectorizationMode::Parallel(_) => {
                 Reader::<P>::new_Parallel(ParallelReader::<P>::new::<I, Out>(
                     input,
                     output,
@@ -67,17 +67,17 @@ pub fn new_coordinates<N: Size>(
     coordinate: usize,
     requirements: ReduceRequirements,
     #[comptime] vectorization_mode: VectorizationMode,
-) -> AccumulatorKind<Vector<u32, N>> {
+) -> Value<Vector<u32, N>> {
     if requirements.coordinates.comptime() {
         // TODO: Make this generic to allow 64-bit coordinate output.
         // Can't directly use `usize` for the buffer, since its size isn't defined beyond the
         // kernel boundary.
-        AccumulatorKind::new_single(fill_coordinate_vector(
+        Value::new_single(fill_coordinate_vector(
             coordinate as u32,
             vectorization_mode,
         ))
     } else {
-        AccumulatorKind::new_None()
+        Value::new_None()
     }
 }
 
@@ -89,7 +89,7 @@ pub(crate) fn fill_coordinate_vector<N: Size>(
     #[comptime] vectorization_mode: VectorizationMode,
 ) -> Vector<u32, N> {
     match vectorization_mode {
-        VectorizationMode::Parallel => {
+        VectorizationMode::Parallel(_) => {
             let mut coordinates = Vector::empty();
             #[unroll]
             for j in 0..N::value() {

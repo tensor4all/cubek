@@ -1,6 +1,6 @@
 use super::{ReduceFamily, ReduceInstruction, ReduceRequirements, Sum};
 use crate::components::{
-    instructions::{Accumulator, AccumulatorKind, Item, ReduceStep},
+    instructions::{Accumulator, Item, ReduceStep, Value, AccumulatorFormat},
     precision::ReducePrecision,
 };
 use cubecl::prelude::*;
@@ -28,6 +28,11 @@ impl<P: ReducePrecision> ReduceInstruction<P> for Mean {
     fn requirements(_this: &Self) -> ReduceRequirements {
         ReduceRequirements { coordinates: false }
     }
+
+    fn accumulator_format(_this: &Self) -> comptime_type!(AccumulatorFormat) {
+        AccumulatorFormat::Single
+    }
+
     fn from_config(_config: Self::Config) -> Self {
         Mean { sum: Sum {} }
     }
@@ -57,12 +62,12 @@ impl<P: ReducePrecision> ReduceInstruction<P> for Mean {
         <Sum as ReduceInstruction<P>>::fuse_accumulators(&this.sum, accumulator, other)
     }
 
-    fn merge_vector<Out: Numeric>(
+    fn to_output_parallel<Out: Numeric>(
         this: &Self,
         accumulator: Accumulator<P>,
         shape_axis_reduce: VectorSize,
-    ) -> AccumulatorKind<Out> {
-        let sum = <Sum as ReduceInstruction<P>>::merge_vector::<P::EA>(
+    ) -> Value<Out> {
+        let sum = <Sum as ReduceInstruction<P>>::to_output_parallel::<P::EA>(
             &this.sum,
             accumulator,
             shape_axis_reduce,
@@ -70,14 +75,14 @@ impl<P: ReducePrecision> ReduceInstruction<P> for Mean {
         .item();
 
         let value = Out::cast_from(sum / P::EA::cast_from(shape_axis_reduce));
-        AccumulatorKind::new_single(value)
+        Value::new_single(value)
     }
 
     fn to_output_perpendicular<Out: Numeric>(
         this: &Self,
         accumulator: Accumulator<P>,
         shape_axis_reduce: VectorSize,
-    ) -> AccumulatorKind<Vector<Out, P::SI>> {
+    ) -> Value<Vector<Out, P::SI>> {
         let sum = <Sum as ReduceInstruction<P>>::to_output_perpendicular::<P::EA>(
             &this.sum,
             accumulator,
@@ -86,6 +91,6 @@ impl<P: ReducePrecision> ReduceInstruction<P> for Mean {
         .item();
 
         let vector = Vector::cast_from(sum / Vector::cast_from(shape_axis_reduce));
-        AccumulatorKind::new_single(vector)
+        Value::new_single(vector)
     }
 }

@@ -38,7 +38,7 @@ pub fn generate_vector_size<R: Runtime>(
     strategy: &VectorizationStrategy,
 ) -> (usize, usize) {
     let vector_size_input = match vectorization_mode {
-        VectorizationMode::Parallel => tensor_vector_size_parallel(
+        VectorizationMode::Parallel(_) => tensor_vector_size_parallel(
             client.io_optimized_vector_sizes(dtype.size()),
             &input.shape,
             &input.strides,
@@ -141,7 +141,7 @@ pub fn generate_vector_size<R: Runtime>(
     }
 
     if strategy.parallel_output_vectorization
-        && vectorization_mode == VectorizationMode::Parallel
+        && matches!(vectorization_mode, VectorizationMode::Parallel(_))
         && vector_size_input > 1
         && is_contiguous(&input.shape, &input.strides)
         && axis == input.shape.len() - 1

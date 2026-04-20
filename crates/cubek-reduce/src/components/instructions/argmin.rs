@@ -2,7 +2,7 @@ use super::{
     ArgAccumulator, ReduceFamily, ReduceInstruction, ReduceRequirements, lowest_coordinate_matching,
 };
 use crate::components::{
-    instructions::{Accumulator, AccumulatorKind, Item, ReduceStep},
+    instructions::{Accumulator, Item, ReduceStep, Value, AccumulatorFormat},
     precision::ReducePrecision,
 };
 use cubecl::prelude::*;
@@ -46,6 +46,11 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ArgMin {
     fn requirements(_this: &Self) -> ReduceRequirements {
         ReduceRequirements { coordinates: true }
     }
+
+    fn accumulator_format(_this: &Self) -> comptime_type!(AccumulatorFormat) {
+        AccumulatorFormat::Single
+    }
+
     fn from_config(_config: Self::Config) -> Self {
         ArgMin {}
     }
@@ -56,8 +61,8 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ArgMin {
 
     fn null_accumulator(_this: &Self) -> Accumulator<P> {
         Accumulator::<P> {
-            elements: AccumulatorKind::new_single(Vector::empty().fill(P::EA::max_value())),
-            args: AccumulatorKind::new_single(Vector::empty().fill(u32::MAX)),
+            elements: Value::new_single(Vector::empty().fill(P::EA::max_value())),
+            args: Value::new_single(Vector::empty().fill(u32::MAX)),
         }
     }
 
@@ -87,10 +92,8 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ArgMin {
             candidate_coordinate,
         );
 
-        accumulator
-            .elements
-            .assign(&AccumulatorKind::new_single(elements));
-        accumulator.args.assign(&AccumulatorKind::new_single(args));
+        accumulator.elements.assign(&Value::new_single(elements));
+        accumulator.args.assign(&Value::new_single(args));
     }
 
     fn plane_reduce_inplace(_this: &Self, accumulator: &mut Accumulator<P>) {
@@ -107,10 +110,8 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ArgMin {
             candidate_coordinate,
         );
 
-        accumulator
-            .elements
-            .assign(&AccumulatorKind::new_single(elements));
-        accumulator.args.assign(&AccumulatorKind::new_single(args));
+        accumulator.elements.assign(&Value::new_single(elements));
+        accumulator.args.assign(&Value::new_single(args));
     }
 
     fn fuse_accumulators(_this: &Self, accumulator: &mut Accumulator<P>, other: &Accumulator<P>) {
@@ -121,17 +122,15 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ArgMin {
             other.args.item(),
         );
 
-        accumulator
-            .elements
-            .assign(&AccumulatorKind::new_single(elements));
-        accumulator.args.assign(&AccumulatorKind::new_single(args));
+        accumulator.elements.assign(&Value::new_single(elements));
+        accumulator.args.assign(&Value::new_single(args));
     }
 
-    fn merge_vector<Out: Numeric>(
+    fn to_output_parallel<Out: Numeric>(
         _this: &Self,
         accumulator: Accumulator<P>,
         _shape_axis_reduce: usize,
-    ) -> AccumulatorKind<Out> {
+    ) -> Value<Out> {
         let vector_size = accumulator.elements.item().size().comptime();
         let value = if vector_size > 1 {
             let mut min = P::EA::max_value();
@@ -154,14 +153,14 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ArgMin {
             Out::cast_from(accumulator.args.item())
         };
 
-        AccumulatorKind::new_single(value)
+        Value::new_single(value)
     }
 
     fn to_output_perpendicular<Out: Numeric>(
         _this: &Self,
         accumulator: Accumulator<P>,
         _shape_axis_reduce: usize,
-    ) -> AccumulatorKind<Vector<Out, P::SI>> {
-        AccumulatorKind::new_single(Vector::cast_from(accumulator.args.item()))
+    ) -> Value<Vector<Out, P::SI>> {
+        Value::new_single(Vector::cast_from(accumulator.args.item()))
     }
 }

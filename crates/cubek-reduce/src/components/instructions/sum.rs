@@ -1,6 +1,6 @@
 use super::{ReduceFamily, ReduceInstruction, ReduceRequirements};
 use crate::components::{
-    instructions::{Accumulator, AccumulatorKind, Item, ReduceStep},
+    instructions::{Accumulator, Item, ReduceStep, Value, AccumulatorFormat},
     precision::ReducePrecision,
 };
 use cubecl::prelude::*;
@@ -22,6 +22,10 @@ impl<P: ReducePrecision> ReduceInstruction<P> for Sum {
         ReduceRequirements { coordinates: false }
     }
 
+    fn accumulator_format(_this: &Self) -> comptime_type!(AccumulatorFormat) {
+        AccumulatorFormat::Single
+    }
+
     fn from_config(_config: Self::Config) -> Self {
         Sum {}
     }
@@ -31,8 +35,8 @@ impl<P: ReducePrecision> ReduceInstruction<P> for Sum {
 
     fn null_accumulator(_this: &Self) -> Accumulator<P> {
         Accumulator::<P> {
-            elements: AccumulatorKind::new_single(Vector::empty().fill(P::EA::from_int(0))),
-            args: AccumulatorKind::new_None(),
+            elements: Value::new_single(Vector::empty().fill(P::EA::from_int(0))),
+            args: Value::new_None(),
         }
     }
 
@@ -49,16 +53,12 @@ impl<P: ReducePrecision> ReduceInstruction<P> for Sum {
             ReduceStep::Identity => *accumulator_item + Vector::cast_from(item),
         };
 
-        accumulator
-            .elements
-            .assign(&AccumulatorKind::new_single(elements));
+        accumulator.elements.assign(&Value::new_single(elements));
     }
 
     fn plane_reduce_inplace(_this: &Self, accumulator: &mut Accumulator<P>) {
         let sum = plane_sum(Vector::cast_from(accumulator.elements.item()));
-        accumulator
-            .elements
-            .assign(&AccumulatorKind::new_single(sum));
+        accumulator.elements.assign(&Value::new_single(sum));
     }
 
     fn fuse_accumulators(_this: &Self, accumulator: &mut Accumulator<P>, other: &Accumulator<P>) {
@@ -67,24 +67,24 @@ impl<P: ReducePrecision> ReduceInstruction<P> for Sum {
 
         accumulator
             .elements
-            .assign(&AccumulatorKind::new_single(accumulator_item + other_item));
+            .assign(&Value::new_single(accumulator_item + other_item));
     }
 
-    fn merge_vector<Out: Numeric>(
+    fn to_output_parallel<Out: Numeric>(
         _this: &Self,
         accumulator: Accumulator<P>,
         _shape_axis_reduce: usize,
-    ) -> AccumulatorKind<Out> {
+    ) -> Value<Out> {
         let sum = Vector::vector_sum(accumulator.elements.item());
 
-        AccumulatorKind::new_single(Out::cast_from(sum))
+        Value::new_single(Out::cast_from(sum))
     }
 
     fn to_output_perpendicular<Out: Numeric>(
         _this: &Self,
         accumulator: Accumulator<P>,
         _shape_axis_reduce: usize,
-    ) -> AccumulatorKind<Vector<Out, P::SI>> {
-        AccumulatorKind::new_single(Vector::cast_from(accumulator.elements.item()))
+    ) -> Value<Vector<Out, P::SI>> {
+        Value::new_single(Vector::cast_from(accumulator.elements.item()))
     }
 }

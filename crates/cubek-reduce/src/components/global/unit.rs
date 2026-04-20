@@ -25,8 +25,15 @@ impl GlobalFullUnitReduce {
         #[comptime] blueprint: UnitReduceBlueprint,
     ) {
         let write_index = ABSOLUTE_POS;
-        let mut writer =
-            Writer::<Out>::new::<P>(input, output, reduce_axis, write_index, vectorization_mode);
+
+        let mut writer = Writer::<Out>::new::<P>(
+            input,
+            output,
+            reduce_axis,
+            write_index,
+            vectorization_mode,
+            I::accumulator_format(inst),
+        );
 
         let write_count = writer.write_count();
         let reduce_index_start = write_index * write_count;

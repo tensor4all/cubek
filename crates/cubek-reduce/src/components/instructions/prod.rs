@@ -1,6 +1,6 @@
 use super::{ReduceFamily, ReduceInstruction};
 use crate::components::{
-    instructions::{Accumulator, AccumulatorKind, Item, ReduceRequirements, ReduceStep},
+    instructions::{Accumulator, Item, ReduceRequirements, ReduceStep, Value, AccumulatorFormat},
     precision::ReducePrecision,
 };
 use cubecl::prelude::*;
@@ -22,6 +22,10 @@ impl<P: ReducePrecision> ReduceInstruction<P> for Prod {
         ReduceRequirements { coordinates: false }
     }
 
+    fn accumulator_format(_this: &Self) -> comptime_type!(AccumulatorFormat) {
+        AccumulatorFormat::Single
+    }
+
     fn from_config(_config: Self::Config) -> Self {
         Prod {}
     }
@@ -31,8 +35,8 @@ impl<P: ReducePrecision> ReduceInstruction<P> for Prod {
 
     fn null_accumulator(_this: &Self) -> Accumulator<P> {
         Accumulator::<P> {
-            elements: AccumulatorKind::new_single(Vector::empty().fill(P::EA::from_int(1))),
-            args: AccumulatorKind::new_None(),
+            elements: Value::new_single(Vector::empty().fill(P::EA::from_int(1))),
+            args: Value::new_None(),
         }
     }
 
@@ -49,16 +53,12 @@ impl<P: ReducePrecision> ReduceInstruction<P> for Prod {
             ReduceStep::Identity => *accumulator_item * item,
         };
 
-        accumulator
-            .elements
-            .assign(&AccumulatorKind::new_single(elements));
+        accumulator.elements.assign(&Value::new_single(elements));
     }
 
     fn plane_reduce_inplace(_this: &Self, accumulator: &mut Accumulator<P>) {
         let prod = plane_prod(Vector::cast_from(accumulator.elements.item()));
-        accumulator
-            .elements
-            .assign(&AccumulatorKind::new_single(prod));
+        accumulator.elements.assign(&Value::new_single(prod));
     }
 
     fn fuse_accumulators(_this: &Self, accumulator: &mut Accumulator<P>, other: &Accumulator<P>) {
@@ -67,28 +67,28 @@ impl<P: ReducePrecision> ReduceInstruction<P> for Prod {
 
         accumulator
             .elements
-            .assign(&AccumulatorKind::new_single(accumulator_item * other_item));
+            .assign(&Value::new_single(accumulator_item * other_item));
     }
 
-    fn merge_vector<Out: Numeric>(
+    fn to_output_parallel<Out: Numeric>(
         _this: &Self,
         accumulator: Accumulator<P>,
         _shape_axis_reduce: usize,
-    ) -> AccumulatorKind<Out> {
+    ) -> Value<Out> {
         let accumulator = accumulator.elements.item();
         let mut prod = P::EA::from_int(1);
         #[unroll]
         for k in 0..accumulator.size() {
             prod *= accumulator[k];
         }
-        AccumulatorKind::new_single(Out::cast_from(prod))
+        Value::new_single(Out::cast_from(prod))
     }
 
     fn to_output_perpendicular<Out: Numeric>(
         _this: &Self,
         accumulator: Accumulator<P>,
         _shape_axis_reduce: usize,
-    ) -> AccumulatorKind<Vector<Out, P::SI>> {
-        AccumulatorKind::new_single(Vector::cast_from(accumulator.elements.item()))
+    ) -> Value<Vector<Out, P::SI>> {
+        Value::new_single(Vector::cast_from(accumulator.elements.item()))
     }
 }

@@ -31,8 +31,14 @@ impl GlobalFullCubeReduce {
         let accumulator_size = blueprint.num_shared_accumulators;
         let worker_pos = Self::worker_pos(blueprint);
 
-        let mut writer =
-            Writer::<Out>::new::<P>(input, output, reduce_axis, write_index, vectorization_mode);
+        let mut writer = Writer::<Out>::new::<P>(
+            input,
+            output,
+            reduce_axis,
+            write_index,
+            vectorization_mode,
+            I::accumulator_format(inst),
+        );
 
         let write_count = writer.write_count();
 

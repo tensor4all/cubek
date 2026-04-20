@@ -5,7 +5,7 @@ use super::contiguous_strides;
 
 /// ArgTopK returns the `k` axis indices of the top values per output slice.
 /// The output shape has `axis` set to `k` (rather than `1` as for scalar reductions).
-pub fn reference_argtopk(input: &HostData, axis: usize, k: u32) -> HostData {
+pub fn reference_argtopk(input: &HostData, axis: usize, k: usize) -> HostData {
     let axis_len = input.shape[axis];
     let k_usize = k as usize;
 

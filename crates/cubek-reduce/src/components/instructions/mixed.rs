@@ -2,11 +2,13 @@ use super::{
     ArgMax, ArgMin, ArgTopK, Max, MaxAbs, Mean, Min, Prod, ReduceFamily, ReduceInstruction,
     ReduceRequirements, SharedAccumulator, Sum,
 };
-use crate::components::instructions::{Accumulator, Item, SharedAccumulatorKind};
+use crate::components::instructions::{
+    Accumulator, AccumulatorFormat, Item, SharedAccumulatorKind,
+};
 use crate::{
     ReduceDtypes,
     components::{
-        instructions::{AccumulatorKind, ReduceStep},
+        instructions::{ReduceStep, Value},
         precision::ReducePrecision,
     },
 };
@@ -40,7 +42,7 @@ pub enum ReduceOperationConfig {
     ArgMin,
     Max,
     Min,
-    ArgTopK(u32),
+    ArgTopK(usize),
 }
 
 impl ReduceOperationConfig {
@@ -133,8 +135,8 @@ pub struct DynamicSharedAccumulator<P: ReducePrecision> {
 
 #[derive(CubeType)]
 pub struct DynamicAccumulator<P: ReducePrecision> {
-    pub elements: AccumulatorKind<Vector<P::EA, P::SI>>,
-    pub args: AccumulatorKind<Vector<u32, P::SI>>,
+    pub elements: Value<Vector<P::EA, P::SI>>,
+    pub args: Value<Vector<u32, P::SI>>,
 }
 
 #[cube]
@@ -186,6 +188,28 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ReduceOperation {
             ReduceOperation::Min(..) => false,
         };
         ReduceRequirements { coordinates }
+    }
+
+    fn accumulator_format(this: &Self) -> comptime_type!(AccumulatorFormat) {
+        match this {
+            ReduceOperation::Sum(sum) => <Sum as ReduceInstruction<P>>::accumulator_format(sum),
+            ReduceOperation::Prod(prod) => <Prod as ReduceInstruction<P>>::accumulator_format(prod),
+            ReduceOperation::Mean(mean) => <Mean as ReduceInstruction<P>>::accumulator_format(mean),
+            ReduceOperation::MaxAbs(maxabs) => {
+                <MaxAbs as ReduceInstruction<P>>::accumulator_format(maxabs)
+            }
+            ReduceOperation::ArgMax(argmax) => {
+                <ArgMax as ReduceInstruction<P>>::accumulator_format(argmax)
+            }
+            ReduceOperation::ArgMin(argmin) => {
+                <ArgMin as ReduceInstruction<P>>::accumulator_format(argmin)
+            }
+            ReduceOperation::ArgTopK(args) => {
+                <ArgTopK as ReduceInstruction<P>>::accumulator_format(args)
+            }
+            ReduceOperation::Max(max) => <Max as ReduceInstruction<P>>::accumulator_format(max),
+            ReduceOperation::Min(min) => <Min as ReduceInstruction<P>>::accumulator_format(min),
+        }
     }
 
     fn from_config(#[comptime] config: Self::Config) -> Self {
@@ -339,61 +363,65 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ReduceOperation {
         }
     }
 
-    // TODO Remove shape_axis_reduce when fusion-on-write is well supported for reduce instructions.
-    //      Then, an instruction like Dynamic can be implemented by fusing a Sum reduction and a element-wise division.
-    fn merge_vector<Out: Numeric>(
+    fn to_output_parallel<Out: Numeric>(
         this: &Self,
         accumulator: Accumulator<P>,
         shape_axis_reduce: usize,
-    ) -> AccumulatorKind<Out> {
+    ) -> Value<Out> {
         match this {
-            ReduceOperation::Sum(sum) => <Sum as ReduceInstruction<P>>::merge_vector::<Out>(
+            ReduceOperation::Sum(sum) => <Sum as ReduceInstruction<P>>::to_output_parallel::<Out>(
                 sum,
                 accumulator,
                 shape_axis_reduce,
             ),
-            ReduceOperation::Prod(prod) => <Prod as ReduceInstruction<P>>::merge_vector::<Out>(
-                prod,
-                accumulator,
-                shape_axis_reduce,
-            ),
-            ReduceOperation::Mean(mean) => <Mean as ReduceInstruction<P>>::merge_vector::<Out>(
-                mean,
-                accumulator,
-                shape_axis_reduce,
-            ),
+            ReduceOperation::Prod(prod) => {
+                <Prod as ReduceInstruction<P>>::to_output_parallel::<Out>(
+                    prod,
+                    accumulator,
+                    shape_axis_reduce,
+                )
+            }
+            ReduceOperation::Mean(mean) => {
+                <Mean as ReduceInstruction<P>>::to_output_parallel::<Out>(
+                    mean,
+                    accumulator,
+                    shape_axis_reduce,
+                )
+            }
             ReduceOperation::MaxAbs(maxabs) => {
-                <MaxAbs as ReduceInstruction<P>>::merge_vector::<Out>(
+                <MaxAbs as ReduceInstruction<P>>::to_output_parallel::<Out>(
                     maxabs,
                     accumulator,
                     shape_axis_reduce,
                 )
             }
             ReduceOperation::ArgMax(argmax) => {
-                <ArgMax as ReduceInstruction<P>>::merge_vector::<Out>(
+                <ArgMax as ReduceInstruction<P>>::to_output_parallel::<Out>(
                     argmax,
                     accumulator,
                     shape_axis_reduce,
                 )
             }
             ReduceOperation::ArgMin(argmin) => {
-                <ArgMin as ReduceInstruction<P>>::merge_vector::<Out>(
+                <ArgMin as ReduceInstruction<P>>::to_output_parallel::<Out>(
                     argmin,
                     accumulator,
                     shape_axis_reduce,
                 )
             }
-            ReduceOperation::ArgTopK(argtopk) => <ArgTopK as ReduceInstruction<P>>::merge_vector::<
-                Out,
-            >(
-                argtopk, accumulator, shape_axis_reduce
-            ),
-            ReduceOperation::Max(max) => <Max as ReduceInstruction<P>>::merge_vector::<Out>(
+            ReduceOperation::ArgTopK(argtopk) => {
+                <ArgTopK as ReduceInstruction<P>>::to_output_parallel::<Out>(
+                    argtopk,
+                    accumulator,
+                    shape_axis_reduce,
+                )
+            }
+            ReduceOperation::Max(max) => <Max as ReduceInstruction<P>>::to_output_parallel::<Out>(
                 max,
                 accumulator,
                 shape_axis_reduce,
             ),
-            ReduceOperation::Min(min) => <Min as ReduceInstruction<P>>::merge_vector::<Out>(
+            ReduceOperation::Min(min) => <Min as ReduceInstruction<P>>::to_output_parallel::<Out>(
                 min,
                 accumulator,
                 shape_axis_reduce,
@@ -405,7 +433,7 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ReduceOperation {
         this: &Self,
         accumulator: Accumulator<P>,
         shape_axis_reduce: usize,
-    ) -> AccumulatorKind<Vector<Out, P::SI>> {
+    ) -> Value<Vector<Out, P::SI>> {
         match this {
             ReduceOperation::Sum(sum) => <Sum as ReduceInstruction<P>>::to_output_perpendicular::<
                 Out,

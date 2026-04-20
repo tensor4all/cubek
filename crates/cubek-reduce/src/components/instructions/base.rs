@@ -13,54 +13,84 @@ pub struct ReduceRequirements {
     pub coordinates: bool,
 }
 
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+pub enum AccumulatorFormat {
+    Multiple(usize),
+    Single,
+}
+
+impl AccumulatorFormat {
+    pub fn len(&self) -> usize {
+        match self {
+            AccumulatorFormat::Multiple(k) => *k,
+            AccumulatorFormat::Single => 1,
+        }
+    }
+}
+
 #[derive(CubeType)]
 /// Whether the accumulator has zero, one or more vectors
-pub enum AccumulatorKind<X: CubePrimitive> {
+pub enum Value<X: CubePrimitive> {
     Multiple(Array<X>),
     /// Wrap the item to be able to modify it as a field
-    Single(ItemWrapper<X>),
+    Single(ValueWrapper<X>),
     None,
 }
 
 #[derive(CubeType)]
 /// Wrap the item to be able to modify it as a field
-pub struct ItemWrapper<X: CubePrimitive> {
-    item: X,
+pub struct ValueWrapper<X: CubePrimitive> {
+    val: X,
 }
 
 #[cube]
-impl<X: CubePrimitive> AccumulatorKind<X> {
-    pub fn new_single(item: X) -> AccumulatorKind<X> {
-        AccumulatorKind::new_Single(ItemWrapper::<X> { item })
+impl<X: CubePrimitive> ValueWrapper<X> {
+    pub fn unwrap(&self) -> X {
+        self.val
+    }
+}
+
+#[cube]
+impl<X: CubePrimitive> Value<X> {
+    pub fn new_single(val: X) -> Value<X> {
+        Value::new_Single(ValueWrapper::<X> { val })
     }
 
     pub fn item(&self) -> X {
         match self {
-            AccumulatorKind::Multiple(_) => panic!("Tried item on Multiple"),
-            AccumulatorKind::Single(item) => item.item,
-            AccumulatorKind::None => panic!("Tried item on None"),
+            Value::Multiple(_) => panic!("Tried item on Multiple"),
+            Value::Single(item) => item.val,
+            Value::None => panic!("Tried item on None"),
         }
     }
 
-    pub fn multiple(self) -> Array<X> {
+    pub fn multiple(&self) -> &Array<X> {
         match self {
-            AccumulatorKind::Multiple(array) => array,
-            AccumulatorKind::Single(_) => panic!("Tried multiple on Single"),
-            AccumulatorKind::None => panic!("Tried multiple on None"),
+            Value::Multiple(array) => array,
+            Value::Single(_) => panic!("Tried multiple on Single"),
+            Value::None => panic!("Tried multiple on None"),
         }
     }
 
-    pub fn assign(&mut self, other: &AccumulatorKind<X>) {
+    pub fn multiple_mut(&mut self) -> &mut Array<X> {
+        match self {
+            Value::Multiple(array) => array,
+            Value::Single(_) => panic!("Tried multiple on Single"),
+            Value::None => panic!("Tried multiple on None"),
+        }
+    }
+
+    pub fn assign(&mut self, other: &Value<X>) {
         match (self, other) {
-            (AccumulatorKind::Multiple(this), AccumulatorKind::Multiple(other)) => {
+            (Value::Multiple(this), Value::Multiple(other)) => {
                 for i in 0..this.len() {
                     this[i] = other[i];
                 }
             }
-            (AccumulatorKind::Single(this), AccumulatorKind::Single(other)) => {
-                this.item = other.item;
+            (Value::Single(this), Value::Single(other)) => {
+                this.val = other.val;
             }
-            (AccumulatorKind::None, AccumulatorKind::None) => {}
+            (Value::None, Value::None) => {}
             _ => panic!("Tried assigning different accumulator kinds"),
         }
     }
@@ -77,17 +107,15 @@ pub enum SharedAccumulatorKind<X: CubePrimitive> {
 
 #[cube]
 impl<X: CubePrimitive> SharedAccumulatorKind<X> {
-    pub fn get(&self, i: usize) -> AccumulatorKind<X> {
+    pub fn get(&self, i: usize) -> Value<X> {
         match self {
             SharedAccumulatorKind::Multiple(_sequence) => todo!(),
-            SharedAccumulatorKind::Single(shared_memory) => {
-                AccumulatorKind::new_single(shared_memory[i])
-            }
-            SharedAccumulatorKind::None => AccumulatorKind::new_None(),
+            SharedAccumulatorKind::Single(shared_memory) => Value::new_single(shared_memory[i]),
+            SharedAccumulatorKind::None => Value::new_None(),
         }
     }
 
-    pub fn set(&mut self, i: usize, value: AccumulatorKind<X>) {
+    pub fn set(&mut self, i: usize, value: Value<X>) {
         match self {
             SharedAccumulatorKind::Multiple(_sequence) => todo!(),
             SharedAccumulatorKind::Single(shared_memory) => shared_memory[i] = value.item(),
@@ -117,6 +145,7 @@ pub trait ReduceInstruction<P: ReducePrecision>:
 
     /// Requirements of the reduce.
     fn requirements(this: &Self) -> ReduceRequirements;
+    fn accumulator_format(this: &Self) -> comptime_type!(AccumulatorFormat);
 
     fn from_config(#[comptime] config: Self::Config) -> Self;
     /// A input such that `Self::reduce(accumulator, Self::null_input(), coordinate, use_planes)`
@@ -142,40 +171,35 @@ pub trait ReduceInstruction<P: ReducePrecision>:
     fn fuse_accumulators(this: &Self, accumulator: &mut Accumulator<P>, other: &Accumulator<P>);
 
     /// Reduce all elements of the accumulator into a single output element of type `Out`.
-    fn merge_vector<Out: Numeric>(
+    fn to_output_parallel<Out: Numeric>(
         this: &Self,
         accumulator: Accumulator<P>,
         shape_axis_reduce: usize,
-    ) -> AccumulatorKind<Out>;
+    ) -> Value<Out>;
 
     /// Convert each element of the accumulator into the expected output element of type `Out`.
     fn to_output_perpendicular<Out: Numeric>(
         this: &Self,
         accumulator: Accumulator<P>,
         shape_axis_reduce: usize,
-    ) -> AccumulatorKind<Vector<Out, P::SI>>;
+    ) -> Value<Vector<Out, P::SI>>;
 }
 
 #[derive(CubeType)]
 pub struct Item<P: ReducePrecision> {
     pub elements: Vector<P::EI, P::SI>,
     // Warning: should not be Multiple
-    pub args: AccumulatorKind<Vector<u32, P::SI>>,
+    pub args: Value<Vector<u32, P::SI>>,
 }
 
 #[derive(CubeType)]
 pub struct Accumulator<P: ReducePrecision> {
-    pub(crate) elements: AccumulatorKind<Vector<P::EA, P::SI>>,
-    pub args: AccumulatorKind<Vector<u32, P::SI>>,
+    pub(crate) elements: Value<Vector<P::EA, P::SI>>,
+    pub args: Value<Vector<u32, P::SI>>,
 }
 
 impl<P: ReducePrecision> Accumulator<P> {
-    pub fn to_elements_and_args(
-        self,
-    ) -> (
-        AccumulatorKind<Vector<P::EA, P::SI>>,
-        AccumulatorKind<Vector<u32, P::SI>>,
-    ) {
+    pub fn to_elements_and_args(self) -> (Value<Vector<P::EA, P::SI>>, Value<Vector<u32, P::SI>>) {
         (self.elements, self.args)
     }
 }
@@ -198,8 +222,8 @@ impl<P: ReducePrecision> SharedAccumulator<P> for SharedMemory<Vector<P::EA, P::
 
     fn read(accumulator: &Self, index: usize) -> Accumulator<P> {
         Accumulator::<P> {
-            elements: AccumulatorKind::new_single(accumulator[index]),
-            args: AccumulatorKind::new_None(),
+            elements: Value::new_single(accumulator[index]),
+            args: Value::new_None(),
         }
     }
 
@@ -235,8 +259,8 @@ impl<P: ReducePrecision> SharedAccumulator<P> for ArgAccumulator<P> {
 
     fn read(accumulator: &Self, index: usize) -> Accumulator<P> {
         Accumulator::<P> {
-            elements: AccumulatorKind::new_single(accumulator.elements[index]),
-            args: AccumulatorKind::new_single(accumulator.args[index]),
+            elements: Value::new_single(accumulator.elements[index]),
+            args: Value::new_single(accumulator.args[index]),
         }
     }
 

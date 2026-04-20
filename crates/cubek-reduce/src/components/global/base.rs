@@ -8,7 +8,7 @@ pub(crate) fn reduce_count(
     #[comptime] input_vector_size: VectorSize,
 ) -> usize {
     match vectorization_mode {
-        VectorizationMode::Parallel => output_size,
+        VectorizationMode::Parallel(_) => output_size,
         VectorizationMode::Perpendicular => output_size / input_vector_size,
     }
 }

@@ -92,7 +92,8 @@ impl<P: ReducePrecision> ParallelReader<P> {
         let args = new_coordinates(
             (plane_pos * self.vector_size) + unit_pos * self.vector_size,
             self.requirements,
-            VectorizationMode::Parallel,
+            // Dummy value, not used
+            comptime!(VectorizationMode::Parallel(0)),
         );
 
         Item::<P> { elements, args }
@@ -109,7 +110,8 @@ impl<P: ReducePrecision> ParallelReader<P> {
         let args = new_coordinates(
             (plane_pos * self.vector_size) + unit_pos * self.vector_size,
             self.requirements,
-            VectorizationMode::Parallel,
+            // Dummy value, not used
+            comptime!(VectorizationMode::Parallel(0)),
         );
 
         Item::<P> { elements, args }
@@ -122,7 +124,8 @@ impl<P: ReducePrecision> ParallelReader<P> {
         let args = new_coordinates(
             vector_index * self.vector_size,
             self.requirements,
-            VectorizationMode::Parallel,
+            // Dummy value, not used
+            comptime!(VectorizationMode::Parallel(0)),
         );
 
         Item::<P> { elements, args }

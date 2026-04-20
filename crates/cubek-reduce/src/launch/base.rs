@@ -47,9 +47,10 @@ pub(crate) fn launch_reduce<Run: Runtime>(
         address_type,
     };
     let vectorization_mode = match input.strides[axis] {
-        1 => VectorizationMode::Parallel,
+        1 => VectorizationMode::new_parallel(&input.strides),
         _ => VectorizationMode::Perpendicular,
     };
+    println!("{:?}", vectorization_mode);
     let (vector_size_input, vector_size_output) = generate_vector_size::<Run>(
         client,
         &input,
