@@ -1,10 +1,9 @@
 use std::marker::PhantomData;
 
-use cubecl::prelude::{CubeType, Scalar, Size};
-use cubecl::{
-    cube,
-    prelude::{Array, Vector},
-};
+use cubecl::comptime;
+use cubecl::cube;
+use cubecl::frontend::CubeIndexMutExpand;
+use cubecl::prelude::*;
 
 use crate::components::instructions::{Accumulator, AccumulatorKind, Item};
 use crate::{
@@ -15,6 +14,7 @@ use cubecl::frontend::Numeric;
 
 #[derive(Debug, CubeType, Clone)]
 pub struct ArgTopK {
+    #[cube(comptime)]
     pub k: u32,
 }
 
@@ -67,28 +67,86 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ArgTopK {
     }
 
     fn null_input(_this: &Self) -> Vector<P::EI, P::SI> {
-        todo!("argtopk")
+        Vector::empty().fill(P::EI::min_value())
     }
 
-    fn null_accumulator(_this: &Self) -> Accumulator<P> {
-        todo!("argtopk")
+    fn null_accumulator(this: &Self) -> Accumulator<P> {
+        let mut elements = Array::new(comptime!(this.k as usize));
+        let mut args = Array::new(comptime!(this.k as usize));
+        for i in 0..this.k {
+            elements[i as usize] = Vector::new(P::EA::min_value());
+            args[i as usize] = Vector::new(u32::MAX);
+        }
+
+        Accumulator::<P> {
+            elements: AccumulatorKind::new_Multiple(elements),
+            args: AccumulatorKind::new_Multiple(args),
+        }
     }
 
-    fn assign_accumulator(
-        _this: &Self,
-        _destination: &mut Accumulator<P>,
-        _source: &Accumulator<P>,
-    ) {
-        todo!("argtopk")
+    fn assign_accumulator(_this: &Self, destination: &mut Accumulator<P>, source: &Accumulator<P>) {
+        destination.elements.assign(&source.elements);
+        destination.args.assign(&source.args);
     }
 
     fn reduce(
-        _this: &Self,
-        _accumulator: &Accumulator<P>,
-        _item: Item<P>,
-        #[comptime] _reduce_step: ReduceStep,
+        this: &Self,
+        accumulator: &Accumulator<P>,
+        item: Item<P>,
+        #[comptime] reduce_step: ReduceStep,
     ) -> Accumulator<P> {
-        todo!("reduce Not implemented")
+        todo!()
+
+        // let coordinate = item.args.item();
+        // let item = item.elements;
+
+        // let (candidate_item, candidate_coordinate) = match reduce_step {
+        //     ReduceStep::Plane => {
+        //         todo!()
+        //         // let candidate_item = plane_max(item);
+        //         // let candidate_coordinate =
+        //         //     lowest_coordinate_matching(candidate_item, item, coordinate);
+        //         // (candidate_item, candidate_coordinate)
+        //     }
+        //     ReduceStep::Identity => (item, coordinate),
+        // };
+
+        // let (elements, args) = accumulator.to_elements_and_args();
+        // let elements = elements.multiple();
+        // let args = args.multiple();
+        // let mut item = Vector::cast_from(item);
+
+        // for k_iter in 0..this.k {
+        //     // let current = elements[k_iter as usize];
+        //     // elements[k_iter as usize] = max(current, item);
+        //     // item = min(current, item);
+
+        //     let current_item = elements[k_iter as usize];
+        //     let current_coord = args[k_iter as usize];
+
+        //     // Reuse your existing tie-breaking logic:
+        //     // keep "0" means items[0] wins the top slot
+        //     let keep0 = select_many(
+        //         current_item.equal(item),
+        //         current_coord.less_than(coordinate),
+        //         current_item.greater_than(item),
+        //     );
+
+        //     let new_top_item = select_many(keep0, current_item, item);
+        //     let new_top_coord = select_many(keep0, current_coord, coordinate);
+        //     let new_rest_item = select_many(keep0, item, current_item);
+        //     let new_rest_coord = select_many(keep0, coordinate, current_coord);
+
+        //     elements[k_iter as usize] = new_top_item;
+        //     args[k_iter as usize] = new_top_coord;
+        //     item = new_rest_item;
+        //     coordinate = new_rest_coord;
+        // }
+
+        // Accumulator::<P> {
+        //     elements: AccumulatorKind::new_Multiple(elements),
+        //     args: AccumulatorKind::new_Multiple(args),
+        // }
     }
 
     fn plane_reduce_inplace(_this: &Self, _accumulator: &mut Accumulator<P>) {

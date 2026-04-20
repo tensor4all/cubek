@@ -97,7 +97,16 @@ pub fn reduce<R: Runtime>(
     dtypes: ReduceDtypes,
 ) -> Result<(), ReduceError> {
     validate_axis(input.shape.len(), axis)?;
-    valid_output_shape(&input.shape, &output.shape, axis)?;
+    valid_output_shape(
+        &input.shape,
+        &output.shape,
+        axis,
+        if let ReduceOperationConfig::ArgTopK(k) = operation {
+            Some(k as usize)
+        } else {
+            None
+        },
+    )?;
 
     launch_reduce::<R>(client, input, output, axis, strategy, dtypes, operation)
 }
@@ -115,9 +124,10 @@ fn valid_output_shape(
     input_shape: &[usize],
     output_shape: &[usize],
     axis: usize,
+    reduced_length: Option<usize>,
 ) -> Result<(), ReduceError> {
     let mut expected_shape = input_shape.to_vec();
-    expected_shape[axis] = 1;
+    expected_shape[axis] = reduced_length.unwrap_or(1);
     if output_shape != expected_shape {
         return Err(ReduceError::MismatchShape {
             expected_shape,

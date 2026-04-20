@@ -175,6 +175,17 @@ pub struct Accumulator<P: ReducePrecision> {
     pub args: AccumulatorKind<Vector<u32, P::SI>>,
 }
 
+impl<P: ReducePrecision> Accumulator<P> {
+    pub fn to_elements_and_args(
+        self,
+    ) -> (
+        AccumulatorKind<Vector<P::EA, P::SI>>,
+        AccumulatorKind<Vector<u32, P::SI>>,
+    ) {
+        (self.elements, self.args)
+    }
+}
+
 /// A simple trait that abstract over a single or multiple shared memory.
 #[cube]
 pub trait SharedAccumulator<P: ReducePrecision>: CubeType + Send + Sync + 'static {
