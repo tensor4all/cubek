@@ -1,156 +1,81 @@
-use cubecl::{define_size, prelude::*};
-use cubek_std::{MatrixLayout, tile::Strided, tile::StridedTile};
+use cubecl::prelude::*;
+use cubek_std::MatrixLayout;
 
 use crate::components::tile::{
-    StandardTileIO, TileMatmul,
-    plane_vec_mat_inner_product::{reader::MatrixFragmentReader, writer::MatrixStageWriter},
+    TileMatmul, Tilex, plane_vec_mat_inner_product::config::PlaneVecMatInnerProductConfig,
+    planevec_allocate_acc, planevec_allocate_lhs, planevec_allocate_rhs, tilex_execute, tilex_load,
+    tilex_write,
 };
-use crate::{
-    components::tile::plane_vec_mat_inner_product::config::PlaneVecMatInnerProductConfig,
-    components::tile::plane_vec_mat_inner_product::reader::MatrixStageReader,
-    components::tile::plane_vec_mat_inner_product::reader::VectorStageReader,
-};
+use crate::definition::StageIdent;
 
-/// Uses one unit to perform a small matmul directly in registers
+/// Performs a small matmul using one vector per unit.
 pub struct PlaneVecMatInnerProduct {}
 
-define_size!(pub NR);
-
-#[derive(CubeType)]
-pub struct VectorContainer<E: Numeric> {
-    pub vector: Vector<E, NR>,
-}
-
 #[cube]
-impl<E: Numeric> VectorContainer<E> {
-    fn new() -> VectorContainer<E> {
-        VectorContainer::<E> {
-            vector: Vector::empty(),
-        }
-    }
-}
-
-#[cube]
-impl<L: Numeric, R: Numeric, A: Numeric> TileMatmul<L, R, A> for PlaneVecMatInnerProduct
-where
-    MatrixStageReader<Option<Strided>>: MatrixFragmentReader<TileKind = Option<Strided>>,
+impl<L: Numeric, VL: Size, R: Numeric, VR: Size, A: Numeric, VA: Size>
+    TileMatmul<L, VL, R, VR, A, VA> for PlaneVecMatInnerProduct
 {
     type Config = PlaneVecMatInnerProductConfig;
 
-    // One vector per unit in the plane
-    type LhsFragment = VectorContainer<L>;
-    // For each n: one vector per unit in the plane
-    type RhsFragment = Sequence<VectorContainer<R>>;
-
-    // For each n: one vector stored at unit pos 0, that will be reduced to a scalar only when writing at the end
-    type AccFragment = Sequence<VectorContainer<A>>;
-
-    type TileIO = StandardTileIO;
-
     fn execute(
-        lhs: &Self::LhsFragment,
-        rhs: &Self::RhsFragment,
-        acc: &mut Self::AccFragment,
-        #[comptime] config: Self::Config,
+        lhs: &Tilex<L, VL, ReadWrite>,
+        rhs: &Tilex<R, VR, ReadWrite>,
+        acc: &mut Tilex<A, VA, ReadWrite>,
+        #[comptime] _config: Self::Config,
     ) {
-        #[unroll]
-        #[allow(clippy::explicit_counter_loop)]
-        for n in 0..config.shared.tile_size.n() as usize {
-            let lhs: Vector<A, NR> = Vector::cast_from(lhs.vector);
-            let rhs: Vector<A, NR> = Vector::cast_from(rhs[n].vector);
-
-            plane_sum_vectorized(lhs * rhs, acc.index_mut(n));
-        }
+        tilex_execute::<L, VL, R, VR, A, VA>(lhs, rhs, acc);
     }
 
     fn allocate_lhs(
-        #[comptime] _layout: MatrixLayout,
+        #[comptime] layout: MatrixLayout,
         #[comptime] config: Self::Config,
-    ) -> Self::LhsFragment {
-        register_vector_size(config.reduce_vector_size);
-        VectorContainer::<L>::new()
+    ) -> Tilex<L, VL, ReadWrite> {
+        planevec_allocate_lhs::<L, VL>(layout, config.shared, config.reduce_vector_size)
     }
 
     fn allocate_rhs(
-        #[comptime] _layout: MatrixLayout,
+        #[comptime] layout: MatrixLayout,
         #[comptime] config: Self::Config,
-    ) -> Self::RhsFragment {
-        register_vector_size(config.reduce_vector_size);
-        let mut rhs = Sequence::new();
-        #[unroll]
-        for _ in 0..config.shared.tile_size.n() {
-            rhs.push(VectorContainer::new())
-        }
-        rhs
+    ) -> Tilex<R, VR, ReadWrite> {
+        planevec_allocate_rhs::<R, VR>(layout, config.shared, config.reduce_vector_size)
     }
 
     fn allocate_acc(
-        #[comptime] _layout: MatrixLayout,
+        #[comptime] layout: MatrixLayout,
         #[comptime] config: Self::Config,
-    ) -> Self::AccFragment {
-        register_vector_size(config.reduce_vector_size);
-        let mut acc = Sequence::new();
-        #[unroll]
-        for _ in 0..config.shared.tile_size.n() {
-            acc.push(VectorContainer::new())
-        }
-        acc
+    ) -> Tilex<A, VA, ReadWrite> {
+        planevec_allocate_acc::<A, VA>(layout, config.shared, config.reduce_vector_size)
     }
 
-    fn load_lhs<E: Numeric, N: Size>(
-        tile: &StridedTile<E, N>,
-        lhs: &mut Self::LhsFragment,
+    fn load_lhs<E: Numeric, ES: Size>(
+        tile: &Tilex<E, ES, ReadOnly>,
+        lhs: &mut Tilex<L, VL, ReadWrite>,
         #[comptime] _config: Self::Config,
     ) {
-        VectorStageReader::load_fragment(tile, lhs)
+        tilex_load::<E, ES, L, VL, L, R, A>(tile, lhs, StageIdent::Lhs);
     }
 
-    fn load_rhs<E: Numeric, N: Size>(
-        tile: &StridedTile<E, N>,
-        rhs: &mut Self::RhsFragment,
-        #[comptime] config: Self::Config,
+    fn load_rhs<E: Numeric, ES: Size>(
+        tile: &Tilex<E, ES, ReadOnly>,
+        rhs: &mut Tilex<R, VR, ReadWrite>,
+        #[comptime] _config: Self::Config,
     ) {
-        MatrixStageReader::<Strided>::load_fragment(tile, rhs, config.shared.tile_size.n())
+        tilex_load::<E, ES, R, VR, L, R, A>(tile, rhs, StageIdent::Rhs);
     }
 
-    fn load_acc<E: Numeric, N: Size>(
-        tile: &ComptimeOption<StridedTile<E, N>>,
-        acc: &mut Self::AccFragment,
-        #[comptime] config: Self::Config,
+    fn load_acc<E: Numeric, ES: Size>(
+        tile: &Tilex<E, ES, ReadOnly>,
+        acc: &mut Tilex<A, VA, ReadWrite>,
+        #[comptime] _config: Self::Config,
     ) {
-        MatrixStageReader::<Option<Strided>>::load_fragment(tile, acc, config.shared.tile_size.n());
+        tilex_load::<E, ES, A, VA, L, R, A>(tile, acc, StageIdent::Acc);
     }
 
-    fn write_results<E: Numeric, N: Size>(
-        tile: &mut StridedTile<E, N, ReadWrite>,
-        acc: &mut Self::AccFragment,
-        #[comptime] config: Self::Config,
+    fn write_results<E: Numeric, ES: Size>(
+        tile: &mut Tilex<E, ES, ReadWrite>,
+        out: &mut Tilex<A, VA, ReadWrite>,
+        #[comptime] _config: Self::Config,
     ) {
-        MatrixStageWriter::store_fragment(
-            tile,
-            acc,
-            config.shared.tile_size.n(),
-            config.reduce_vector_size as usize,
-        )
+        tilex_write::<E, ES, A, VA, L, R>(tile, out);
     }
-}
-
-#[cube]
-fn plane_sum_vectorized<E: Numeric, N: Size>(
-    vector_to_sum: Vector<E, N>,
-    vector_accumulator: &mut VectorContainer<E>,
-) {
-    #[unroll]
-    #[allow(clippy::explicit_counter_loop)]
-    for vector_iterator in 0..N::value() {
-        vector_accumulator.vector[vector_iterator] += plane_sum(vector_to_sum[vector_iterator]);
-    }
-}
-
-#[cube]
-#[allow(unused)]
-fn register_vector_size(#[comptime] vector_size: u32) {
-    intrinsic!(|scope| {
-        scope.register_size::<NR>(vector_size as usize);
-    })
 }

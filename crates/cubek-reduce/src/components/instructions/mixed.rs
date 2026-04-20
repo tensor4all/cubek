@@ -1,10 +1,14 @@
 use super::{
-    ArgMax, ArgMin, ArgTopK, Max, MaxAbs, Mean, Min, Prod, ReduceCoordinate, ReduceFamily,
-    ReduceInstruction, ReduceRequirements, SharedAccumulator, Sum,
+    ArgMax, ArgMin, ArgTopK, Max, MaxAbs, Mean, Min, Prod, ReduceFamily, ReduceInstruction,
+    ReduceRequirements, SharedAccumulator, Sum,
 };
+use crate::components::instructions::{Accumulator, Item, SharedAccumulatorKind};
 use crate::{
     ReduceDtypes,
-    components::{instructions::ReduceStep, precision::ReducePrecision},
+    components::{
+        instructions::{AccumulatorKind, ReduceStep},
+        precision::ReducePrecision,
+    },
 };
 use cubecl::{
     ir::{ElemType, FloatKind, IntKind, UIntKind},
@@ -122,55 +126,51 @@ impl ReduceFamily for ReduceOperation {
 }
 
 #[derive(CubeType)]
-pub struct DynamicAccumulator<T: Numeric, N: Size> {
-    pub elements: SharedMemory<Vector<T, N>>,
-    pub args: ComptimeOption<SharedMemory<Vector<u32, N>>>,
+pub struct DynamicSharedAccumulator<P: ReducePrecision> {
+    pub elements: SharedAccumulatorKind<Vector<P::EA, P::SI>>,
+    pub args: SharedAccumulatorKind<Vector<u32, P::SI>>,
 }
 
 #[derive(CubeType)]
-pub struct DynamicAccumulatorItem<T: Numeric, N: Size> {
-    pub elements: Vector<T, N>,
-    pub args: ComptimeOption<Vector<u32, N>>,
+pub struct DynamicAccumulator<P: ReducePrecision> {
+    pub elements: AccumulatorKind<Vector<P::EA, P::SI>>,
+    pub args: AccumulatorKind<Vector<u32, P::SI>>,
 }
 
 #[cube]
-impl<In: Numeric, N: Size> SharedAccumulator for DynamicAccumulator<In, N> {
-    type Item = DynamicAccumulatorItem<In, N>;
-
+impl<P: ReducePrecision> SharedAccumulator<P> for DynamicSharedAccumulator<P> {
     fn allocate(#[comptime] length: usize, #[comptime] coordinate: bool) -> Self {
         let elements = SharedMemory::new(length);
+        // TODO how to put multiple?
         let args = if coordinate {
             let args = SharedMemory::new(length);
-            ComptimeOption::new_Some(args)
+            SharedAccumulatorKind::new_Single(args)
         } else {
-            ComptimeOption::new_None()
+            SharedAccumulatorKind::new_None()
         };
 
-        DynamicAccumulator::<In, N> { elements, args }
+        DynamicSharedAccumulator::<P> {
+            elements: SharedAccumulatorKind::new_Single(elements),
+            args,
+        }
     }
 
-    fn read(accumulator: &Self, index: usize) -> Self::Item {
-        let elements = accumulator.elements[index];
-        let args = accumulator.args.map(|args| args[index]);
+    fn read(accumulator: &Self, index: usize) -> Accumulator<P> {
+        let elements = accumulator.elements.get(index);
+        let args = accumulator.args.get(index);
 
-        DynamicAccumulatorItem::<In, N> { elements, args }
+        Accumulator::<P> { elements, args }
     }
 
-    fn write(accumulator: &mut Self, index: usize, item: Self::Item) {
-        accumulator.elements[index] = item.elements;
-
-        let args = &mut accumulator.args;
-        #[comptime]
-        if let ComptimeOption::Some((args, item_args)) = args.as_mut().zip(item.args) {
-            args[index] = item_args;
-        };
+    fn write(accumulator: &mut Self, index: usize, item: Accumulator<P>) {
+        accumulator.elements.set(index, item.elements);
+        accumulator.args.set(index, item.args);
     }
 }
 
 #[cube]
 impl<P: ReducePrecision> ReduceInstruction<P> for ReduceOperation {
-    type AccumulatorItem = DynamicAccumulatorItem<P::EA, P::SI>;
-    type SharedAccumulator = DynamicAccumulator<P::EA, P::SI>;
+    type SharedAccumulator = DynamicSharedAccumulator<P>;
     type Config = ReduceOperationConfig;
 
     fn requirements(this: &Self) -> ReduceRequirements {
@@ -216,371 +216,136 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ReduceOperation {
         }
     }
 
-    fn null_accumulator(this: &Self) -> Self::AccumulatorItem {
+    fn null_accumulator(this: &Self) -> Accumulator<P> {
         match this {
-            ReduceOperation::Sum(sum) => {
-                let elements = <Sum as ReduceInstruction<P>>::null_accumulator(sum);
-
-                DynamicAccumulatorItem::<P::EA, P::SI> {
-                    elements,
-                    args: ComptimeOption::new_None(),
-                }
-            }
-            ReduceOperation::Mean(sum) => {
-                let elements = <Mean as ReduceInstruction<P>>::null_accumulator(sum);
-
-                DynamicAccumulatorItem::<P::EA, P::SI> {
-                    elements,
-                    args: ComptimeOption::new_None(),
-                }
-            }
-            ReduceOperation::Prod(sum) => {
-                let elements = <Prod as ReduceInstruction<P>>::null_accumulator(sum);
-
-                DynamicAccumulatorItem::<P::EA, P::SI> {
-                    elements,
-                    args: ComptimeOption::new_None(),
-                }
-            }
+            ReduceOperation::Sum(sum) => <Sum as ReduceInstruction<P>>::null_accumulator(sum),
+            ReduceOperation::Mean(sum) => <Mean as ReduceInstruction<P>>::null_accumulator(sum),
+            ReduceOperation::Prod(prod) => <Prod as ReduceInstruction<P>>::null_accumulator(prod),
             ReduceOperation::MaxAbs(maxabs) => {
-                let elements = <MaxAbs as ReduceInstruction<P>>::null_accumulator(maxabs);
-
-                DynamicAccumulatorItem::<P::EA, P::SI> {
-                    elements,
-                    args: ComptimeOption::new_None(),
-                }
+                <MaxAbs as ReduceInstruction<P>>::null_accumulator(maxabs)
             }
             ReduceOperation::ArgMax(argmax) => {
-                let (elements, args) = <ArgMax as ReduceInstruction<P>>::null_accumulator(argmax);
-
-                DynamicAccumulatorItem::<P::EA, P::SI> {
-                    elements,
-                    args: ComptimeOption::new_Some(args),
-                }
+                <ArgMax as ReduceInstruction<P>>::null_accumulator(argmax)
             }
             ReduceOperation::ArgMin(argmin) => {
-                let (elements, args) = <ArgMin as ReduceInstruction<P>>::null_accumulator(argmin);
-
-                DynamicAccumulatorItem::<P::EA, P::SI> {
-                    elements,
-                    args: ComptimeOption::new_Some(args),
-                }
+                <ArgMin as ReduceInstruction<P>>::null_accumulator(argmin)
             }
             ReduceOperation::ArgTopK(args) => {
-                let (elements, args) = <ArgTopK as ReduceInstruction<P>>::null_accumulator(args);
-
-                DynamicAccumulatorItem::<P::EA, P::SI> {
-                    elements,
-                    args: ComptimeOption::new_Some(args),
-                }
+                <ArgTopK as ReduceInstruction<P>>::null_accumulator(args)
             }
-            ReduceOperation::Max(max) => {
-                let elements = <Max as ReduceInstruction<P>>::null_accumulator(max);
-
-                DynamicAccumulatorItem::<P::EA, P::SI> {
-                    elements,
-                    args: ComptimeOption::new_None(),
-                }
-            }
-            ReduceOperation::Min(min) => {
-                let elements = <Min as ReduceInstruction<P>>::null_accumulator(min);
-
-                DynamicAccumulatorItem::<P::EA, P::SI> {
-                    elements,
-                    args: ComptimeOption::new_None(),
-                }
-            }
-        }
-    }
-
-    fn read_accumulator(
-        this: &Self,
-        accumulator: &Self::AccumulatorItem,
-    ) -> (Vector<P::EI, P::SI>, ReduceCoordinate<P::SI>) {
-        match this {
-            ReduceOperation::Sum(sum) => {
-                <Sum as ReduceInstruction<P>>::read_accumulator(sum, &accumulator.elements)
-            }
-            ReduceOperation::Prod(prod) => {
-                <Prod as ReduceInstruction<P>>::read_accumulator(prod, &accumulator.elements)
-            }
-            ReduceOperation::Mean(mean) => {
-                <Mean as ReduceInstruction<P>>::read_accumulator(mean, &accumulator.elements)
-            }
-            ReduceOperation::MaxAbs(maxabs) => {
-                <MaxAbs as ReduceInstruction<P>>::read_accumulator(maxabs, &accumulator.elements)
-            }
-            ReduceOperation::ArgMax(argmax) => <ArgMax as ReduceInstruction<P>>::read_accumulator(
-                argmax,
-                &(accumulator.elements, accumulator.args.unwrap()),
-            ),
-            ReduceOperation::ArgMin(argmin) => <ArgMin as ReduceInstruction<P>>::read_accumulator(
-                argmin,
-                &(accumulator.elements, accumulator.args.unwrap()),
-            ),
-            ReduceOperation::ArgTopK(args) => <ArgTopK as ReduceInstruction<P>>::read_accumulator(
-                args,
-                &(accumulator.elements, accumulator.args.unwrap()),
-            ),
-            ReduceOperation::Max(max) => {
-                <Max as ReduceInstruction<P>>::read_accumulator(max, &accumulator.elements)
-            }
-            ReduceOperation::Min(min) => {
-                <Min as ReduceInstruction<P>>::read_accumulator(min, &accumulator.elements)
-            }
+            ReduceOperation::Max(max) => <Max as ReduceInstruction<P>>::null_accumulator(max),
+            ReduceOperation::Min(min) => <Min as ReduceInstruction<P>>::null_accumulator(min),
         }
     }
 
     #[allow(unused_mut)]
     #[allow(unused_mut)]
-    fn assign_accumulator(
-        _this: &Self,
-        destination: &mut Self::AccumulatorItem,
-        source: &Self::AccumulatorItem,
-    ) {
-        destination.elements = source.elements;
-        let args = &mut destination.args;
-        #[comptime]
-        if let ComptimeOption::Some((mut val, source_val)) = args.as_mut().zip(source.args) {
-            *val = source_val;
-        }
+    fn assign_accumulator(_this: &Self, destination: &mut Accumulator<P>, source: &Accumulator<P>) {
+        destination.elements.assign(&source.elements);
+        destination.args.assign(&source.args);
     }
 
     fn reduce(
         this: &Self,
-        accumulator: &Self::AccumulatorItem,
-        item: Vector<P::EI, P::SI>,
-        coordinate: ReduceCoordinate<P::SI>,
+        accumulator: &Accumulator<P>,
+        item: Item<P>,
         #[comptime] reduce_step: ReduceStep,
-    ) -> Self::AccumulatorItem {
+    ) -> Accumulator<P> {
         match this {
             ReduceOperation::Sum(sum) => {
-                let elements = <Sum as ReduceInstruction<P>>::reduce(
-                    sum,
-                    &accumulator.elements,
-                    item,
-                    coordinate,
-                    reduce_step,
-                );
-                DynamicAccumulatorItem::<P::EA, P::SI> {
-                    elements,
-                    args: ComptimeOption::new_None(),
-                }
+                <Sum as ReduceInstruction<P>>::reduce(sum, accumulator, item, reduce_step)
             }
             ReduceOperation::Prod(sum) => {
-                let elements = <Prod as ReduceInstruction<P>>::reduce(
-                    sum,
-                    &accumulator.elements,
-                    item,
-                    coordinate,
-                    reduce_step,
-                );
-                DynamicAccumulatorItem::<P::EA, P::SI> {
-                    elements,
-                    args: ComptimeOption::new_None(),
-                }
+                <Prod as ReduceInstruction<P>>::reduce(sum, accumulator, item, reduce_step)
             }
             ReduceOperation::Mean(sum) => {
-                let elements = <Mean as ReduceInstruction<P>>::reduce(
-                    sum,
-                    &accumulator.elements,
-                    item,
-                    coordinate,
-                    reduce_step,
-                );
-                DynamicAccumulatorItem::<P::EA, P::SI> {
-                    elements,
-                    args: ComptimeOption::new_None(),
-                }
+                <Mean as ReduceInstruction<P>>::reduce(sum, accumulator, item, reduce_step)
             }
             ReduceOperation::MaxAbs(maxabs) => {
-                let elements = <MaxAbs as ReduceInstruction<P>>::reduce(
-                    maxabs,
-                    &accumulator.elements,
-                    item,
-                    coordinate,
-                    reduce_step,
-                );
-                DynamicAccumulatorItem::<P::EA, P::SI> {
-                    elements,
-                    args: ComptimeOption::new_None(),
-                }
+                <MaxAbs as ReduceInstruction<P>>::reduce(maxabs, accumulator, item, reduce_step)
             }
             ReduceOperation::ArgMax(argmax) => {
-                let (elements, args) = <ArgMax as ReduceInstruction<P>>::reduce(
-                    argmax,
-                    &(accumulator.elements, accumulator.args.unwrap()),
-                    item,
-                    coordinate,
-                    reduce_step,
-                );
-
-                DynamicAccumulatorItem::<P::EA, P::SI> {
-                    elements,
-                    args: ComptimeOption::new_Some(args),
-                }
+                <ArgMax as ReduceInstruction<P>>::reduce(argmax, accumulator, item, reduce_step)
             }
             ReduceOperation::ArgMin(argmin) => {
-                let (elements, args) = <ArgMin as ReduceInstruction<P>>::reduce(
-                    argmin,
-                    &(accumulator.elements, accumulator.args.unwrap()),
-                    item,
-                    coordinate,
-                    reduce_step,
-                );
-
-                DynamicAccumulatorItem::<P::EA, P::SI> {
-                    elements,
-                    args: ComptimeOption::new_Some(args),
-                }
+                <ArgMin as ReduceInstruction<P>>::reduce(argmin, accumulator, item, reduce_step)
             }
-            ReduceOperation::ArgTopK(args) => {
-                let (elements, args) = <ArgTopK as ReduceInstruction<P>>::reduce(
-                    args,
-                    &(accumulator.elements, accumulator.args.unwrap()),
-                    item,
-                    coordinate,
-                    reduce_step,
-                );
-
-                DynamicAccumulatorItem::<P::EA, P::SI> {
-                    elements,
-                    args: ComptimeOption::new_Some(args),
-                }
+            ReduceOperation::ArgTopK(argtopk) => {
+                <ArgTopK as ReduceInstruction<P>>::reduce(argtopk, accumulator, item, reduce_step)
             }
             ReduceOperation::Max(max) => {
-                let elements = <Max as ReduceInstruction<P>>::reduce(
-                    max,
-                    &accumulator.elements,
-                    item,
-                    coordinate,
-                    reduce_step,
-                );
-                DynamicAccumulatorItem::<P::EA, P::SI> {
-                    elements,
-                    args: ComptimeOption::new_None(),
-                }
+                <Max as ReduceInstruction<P>>::reduce(max, accumulator, item, reduce_step)
             }
             ReduceOperation::Min(min) => {
-                let elements = <Min as ReduceInstruction<P>>::reduce(
-                    min,
-                    &accumulator.elements,
-                    item,
-                    coordinate,
-                    reduce_step,
-                );
-                DynamicAccumulatorItem::<P::EA, P::SI> {
-                    elements,
-                    args: ComptimeOption::new_None(),
-                }
+                <Min as ReduceInstruction<P>>::reduce(min, accumulator, item, reduce_step)
+            }
+        }
+    }
+
+    fn plane_reduce_inplace(this: &Self, accumulator: &mut Accumulator<P>) {
+        match this {
+            ReduceOperation::Sum(sum) => {
+                <Sum as ReduceInstruction<P>>::plane_reduce_inplace(sum, accumulator)
+            }
+            ReduceOperation::Prod(prod) => {
+                <Prod as ReduceInstruction<P>>::plane_reduce_inplace(prod, accumulator)
+            }
+            ReduceOperation::Mean(mean) => {
+                <Mean as ReduceInstruction<P>>::plane_reduce_inplace(mean, accumulator)
+            }
+            ReduceOperation::MaxAbs(max_abs) => {
+                <MaxAbs as ReduceInstruction<P>>::plane_reduce_inplace(max_abs, accumulator)
+            }
+            ReduceOperation::ArgMax(arg_max) => {
+                <ArgMax as ReduceInstruction<P>>::plane_reduce_inplace(arg_max, accumulator)
+            }
+            ReduceOperation::ArgMin(arg_min) => {
+                <ArgMin as ReduceInstruction<P>>::plane_reduce_inplace(arg_min, accumulator)
+            }
+            ReduceOperation::Max(max) => {
+                <Max as ReduceInstruction<P>>::plane_reduce_inplace(max, accumulator)
+            }
+            ReduceOperation::Min(min) => {
+                <Min as ReduceInstruction<P>>::plane_reduce_inplace(min, accumulator)
+            }
+            ReduceOperation::ArgTopK(argtopk) => {
+                <ArgTopK as ReduceInstruction<P>>::plane_reduce_inplace(argtopk, accumulator)
             }
         }
     }
 
     fn fuse_accumulators(
         this: &Self,
-        lhs: Self::AccumulatorItem,
-        rhs: Self::AccumulatorItem,
-    ) -> Self::AccumulatorItem {
+        lhs: &Accumulator<P>,
+        rhs: &Accumulator<P>,
+    ) -> Accumulator<P> {
         match this {
             ReduceOperation::Sum(sum) => {
-                let elements = <Sum as ReduceInstruction<P>>::fuse_accumulators(
-                    sum,
-                    lhs.elements,
-                    rhs.elements,
-                );
-                DynamicAccumulatorItem::<P::EA, P::SI> {
-                    elements,
-                    args: ComptimeOption::new_None(),
-                }
+                <Sum as ReduceInstruction<P>>::fuse_accumulators(sum, lhs, rhs)
             }
             ReduceOperation::Prod(prod) => {
-                let elements = <Prod as ReduceInstruction<P>>::fuse_accumulators(
-                    prod,
-                    lhs.elements,
-                    rhs.elements,
-                );
-                DynamicAccumulatorItem::<P::EA, P::SI> {
-                    elements,
-                    args: ComptimeOption::new_None(),
-                }
+                <Prod as ReduceInstruction<P>>::fuse_accumulators(prod, lhs, rhs)
             }
             ReduceOperation::Mean(mean) => {
-                let elements = <Mean as ReduceInstruction<P>>::fuse_accumulators(
-                    mean,
-                    lhs.elements,
-                    rhs.elements,
-                );
-                DynamicAccumulatorItem::<P::EA, P::SI> {
-                    elements,
-                    args: ComptimeOption::new_None(),
-                }
+                <Mean as ReduceInstruction<P>>::fuse_accumulators(mean, lhs, rhs)
             }
             ReduceOperation::MaxAbs(maxabs) => {
-                let elements = <MaxAbs as ReduceInstruction<P>>::fuse_accumulators(
-                    maxabs,
-                    lhs.elements,
-                    rhs.elements,
-                );
-                DynamicAccumulatorItem::<P::EA, P::SI> {
-                    elements,
-                    args: ComptimeOption::new_None(),
-                }
+                <MaxAbs as ReduceInstruction<P>>::fuse_accumulators(maxabs, lhs, rhs)
             }
             ReduceOperation::ArgMax(argmax) => {
-                let (elements, args) = <ArgMax as ReduceInstruction<P>>::fuse_accumulators(
-                    argmax,
-                    (lhs.elements, lhs.args.unwrap()),
-                    (rhs.elements, rhs.args.unwrap()),
-                );
-                DynamicAccumulatorItem::<P::EA, P::SI> {
-                    elements,
-                    args: ComptimeOption::new_Some(args),
-                }
+                <ArgMax as ReduceInstruction<P>>::fuse_accumulators(argmax, lhs, rhs)
             }
             ReduceOperation::ArgMin(argmin) => {
-                let (elements, args) = <ArgMin as ReduceInstruction<P>>::fuse_accumulators(
-                    argmin,
-                    (lhs.elements, lhs.args.unwrap()),
-                    (rhs.elements, rhs.args.unwrap()),
-                );
-                DynamicAccumulatorItem::<P::EA, P::SI> {
-                    elements,
-                    args: ComptimeOption::new_Some(args),
-                }
+                <ArgMin as ReduceInstruction<P>>::fuse_accumulators(argmin, lhs, rhs)
             }
-            ReduceOperation::ArgTopK(args) => {
-                let (elements, args) = <ArgTopK as ReduceInstruction<P>>::fuse_accumulators(
-                    args,
-                    (lhs.elements, lhs.args.unwrap()),
-                    (rhs.elements, rhs.args.unwrap()),
-                );
-                DynamicAccumulatorItem::<P::EA, P::SI> {
-                    elements,
-                    args: ComptimeOption::new_Some(args),
-                }
+            ReduceOperation::ArgTopK(argtopk) => {
+                <ArgTopK as ReduceInstruction<P>>::fuse_accumulators(argtopk, lhs, rhs)
             }
             ReduceOperation::Max(max) => {
-                let elements = <Max as ReduceInstruction<P>>::fuse_accumulators(
-                    max,
-                    lhs.elements,
-                    rhs.elements,
-                );
-                DynamicAccumulatorItem::<P::EA, P::SI> {
-                    elements,
-                    args: ComptimeOption::new_None(),
-                }
+                <Max as ReduceInstruction<P>>::fuse_accumulators(max, lhs, rhs)
             }
             ReduceOperation::Min(min) => {
-                let elements = <Min as ReduceInstruction<P>>::fuse_accumulators(
-                    min,
-                    lhs.elements,
-                    rhs.elements,
-                );
-                DynamicAccumulatorItem::<P::EA, P::SI> {
-                    elements,
-                    args: ComptimeOption::new_None(),
-                }
+                <Min as ReduceInstruction<P>>::fuse_accumulators(min, lhs, rhs)
             }
         }
     }
@@ -589,61 +354,59 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ReduceOperation {
     //      Then, an instruction like Dynamic can be implemented by fusing a Sum reduction and a element-wise division.
     fn merge_vector<Out: Numeric>(
         this: &Self,
-        accumulator: Self::AccumulatorItem,
+        accumulator: Accumulator<P>,
         shape_axis_reduce: usize,
-    ) -> Out {
+    ) -> AccumulatorKind<Out> {
         match this {
             ReduceOperation::Sum(sum) => <Sum as ReduceInstruction<P>>::merge_vector::<Out>(
                 sum,
-                accumulator.elements,
+                accumulator,
                 shape_axis_reduce,
             ),
             ReduceOperation::Prod(prod) => <Prod as ReduceInstruction<P>>::merge_vector::<Out>(
                 prod,
-                accumulator.elements,
+                accumulator,
                 shape_axis_reduce,
             ),
             ReduceOperation::Mean(mean) => <Mean as ReduceInstruction<P>>::merge_vector::<Out>(
                 mean,
-                accumulator.elements,
+                accumulator,
                 shape_axis_reduce,
             ),
             ReduceOperation::MaxAbs(maxabs) => {
                 <MaxAbs as ReduceInstruction<P>>::merge_vector::<Out>(
                     maxabs,
-                    accumulator.elements,
+                    accumulator,
                     shape_axis_reduce,
                 )
             }
             ReduceOperation::ArgMax(argmax) => {
                 <ArgMax as ReduceInstruction<P>>::merge_vector::<Out>(
                     argmax,
-                    (accumulator.elements, accumulator.args.unwrap()),
+                    accumulator,
                     shape_axis_reduce,
                 )
             }
             ReduceOperation::ArgMin(argmin) => {
                 <ArgMin as ReduceInstruction<P>>::merge_vector::<Out>(
                     argmin,
-                    (accumulator.elements, accumulator.args.unwrap()),
+                    accumulator,
                     shape_axis_reduce,
                 )
             }
-            ReduceOperation::ArgTopK(args) => {
-                <ArgTopK as ReduceInstruction<P>>::merge_vector::<Out>(
-                    args,
-                    (accumulator.elements, accumulator.args.unwrap()),
-                    shape_axis_reduce,
-                )
-            }
+            ReduceOperation::ArgTopK(argtopk) => <ArgTopK as ReduceInstruction<P>>::merge_vector::<
+                Out,
+            >(
+                argtopk, accumulator, shape_axis_reduce
+            ),
             ReduceOperation::Max(max) => <Max as ReduceInstruction<P>>::merge_vector::<Out>(
                 max,
-                accumulator.elements,
+                accumulator,
                 shape_axis_reduce,
             ),
             ReduceOperation::Min(min) => <Min as ReduceInstruction<P>>::merge_vector::<Out>(
                 min,
-                accumulator.elements,
+                accumulator,
                 shape_axis_reduce,
             ),
         }
@@ -651,61 +414,61 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ReduceOperation {
 
     fn to_output_perpendicular<Out: Numeric>(
         this: &Self,
-        accumulator: Self::AccumulatorItem,
+        accumulator: Accumulator<P>,
         shape_axis_reduce: usize,
-    ) -> Vector<Out, P::SI> {
+    ) -> AccumulatorKind<Vector<Out, P::SI>> {
         match this {
             ReduceOperation::Sum(sum) => <Sum as ReduceInstruction<P>>::to_output_perpendicular::<
                 Out,
-            >(sum, accumulator.elements, shape_axis_reduce),
+            >(sum, accumulator, shape_axis_reduce),
             ReduceOperation::Prod(prod) => {
                 <Prod as ReduceInstruction<P>>::to_output_perpendicular::<Out>(
                     prod,
-                    accumulator.elements,
+                    accumulator,
                     shape_axis_reduce,
                 )
             }
             ReduceOperation::Mean(mean) => {
                 <Mean as ReduceInstruction<P>>::to_output_perpendicular::<Out>(
                     mean,
-                    accumulator.elements,
+                    accumulator,
                     shape_axis_reduce,
                 )
             }
             ReduceOperation::MaxAbs(maxabs) => {
                 <MaxAbs as ReduceInstruction<P>>::to_output_perpendicular::<Out>(
                     maxabs,
-                    accumulator.elements,
+                    accumulator,
                     shape_axis_reduce,
                 )
             }
             ReduceOperation::ArgMax(args) => {
                 <ArgMax as ReduceInstruction<P>>::to_output_perpendicular::<Out>(
                     args,
-                    (accumulator.elements, accumulator.args.unwrap()),
+                    accumulator,
                     shape_axis_reduce,
                 )
             }
-            ReduceOperation::ArgTopK(args) => {
+            ReduceOperation::ArgTopK(argtopk) => {
                 <ArgTopK as ReduceInstruction<P>>::to_output_perpendicular::<Out>(
-                    args,
-                    (accumulator.elements, accumulator.args.unwrap()),
+                    argtopk,
+                    accumulator,
                     shape_axis_reduce,
                 )
             }
             ReduceOperation::ArgMin(args) => {
                 <ArgMin as ReduceInstruction<P>>::to_output_perpendicular::<Out>(
                     args,
-                    (accumulator.elements, accumulator.args.unwrap()),
+                    accumulator,
                     shape_axis_reduce,
                 )
             }
             ReduceOperation::Max(max) => <Max as ReduceInstruction<P>>::to_output_perpendicular::<
                 Out,
-            >(max, accumulator.elements, shape_axis_reduce),
+            >(max, accumulator, shape_axis_reduce),
             ReduceOperation::Min(min) => <Min as ReduceInstruction<P>>::to_output_perpendicular::<
                 Out,
-            >(min, accumulator.elements, shape_axis_reduce),
+            >(min, accumulator, shape_axis_reduce),
         }
     }
 }

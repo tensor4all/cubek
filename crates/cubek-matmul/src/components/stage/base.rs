@@ -2,17 +2,19 @@ use cubecl::{
     std::tensor::layout::Coords2d,
     {ir::DeviceProperties, prelude::*},
 };
-use cubek_std::{InvalidConfigError, stage::StageMemoryConfig, tile::TileKind};
+use cubek_std::{InvalidConfigError, stage::StageMemoryConfig};
 
 use crate::{
-    components::stage::NumStages,
-    components::stage::PartitionScheduler,
-    components::tile::TileConfig,
-    definition::TilingBlueprint,
-    definition::{MatmulElems, MatmulSetupError, MatmulTypes, MatmulVectorSizes},
-    {components::CubeDimResource, definition::Lhs},
-    {components::global::PlaneFlowConfig, definition::Acc},
-    {components::global::WriteEventListener, definition::Rhs},
+    components::{
+        CubeDimResource,
+        global::{PlaneFlowConfig, WriteEventListener},
+        stage::{NumStages, PartitionScheduler},
+        tile::{TileConfig, Tilex},
+    },
+    definition::{
+        Acc, Lhs, MatmulElems, MatmulSetupError, MatmulTypes, MatmulVectorSizes, Rhs,
+        TilingBlueprint,
+    },
 };
 use std::{fmt::Debug, hash::Hash};
 
@@ -194,19 +196,14 @@ pub enum PartitionBuffering {
 pub trait Stage<ES: Numeric, NS: Size, IO: SliceVisibility = ReadOnly>:
     CubeType + Clone + Send + Sync + 'static
 {
-    /// The kind (or family) of the tiles contained in this stage
-    type TileKind: TileKind<IO>;
-
     /// Slices a tile with offset (`row`, `col`) from the stage and returns it
-    fn tile(this: &Self, tile: Coords2d) -> <Self::TileKind as TileKind<IO>>::Tile<ES, NS>;
+    fn tile(this: &Self, tile: Coords2d) -> Tilex<ES, NS, IO>;
 }
 
 /// Stage family for any precision
 pub trait StageFamily<IO: SliceVisibility = ReadOnly>: Send + Sync + 'static {
-    /// The tile kind (family) contained in the stage
-    type TileKind: TileKind<IO>;
     /// The concrete stage type of this family, instantiated with the type and layout
-    type Stage<ES: Numeric, NS: Size, T: TilingLayout>: Stage<ES, NS, IO, TileKind = Self::TileKind>;
+    type Stage<ES: Numeric, NS: Size, T: TilingLayout>: Stage<ES, NS, IO>;
 }
 
 /// Stage family that can be used as the target of a loader
@@ -230,10 +227,13 @@ pub trait LoadStageFamily<IO: SliceVisibility = ReadOnly>: StageFamily {
 impl<ES: Numeric, NS: Size, IO: SliceVisibility, Inner: Stage<ES, NS, IO>> Stage<ES, NS, IO>
     for ComptimeOption<Inner>
 {
-    type TileKind = Option<Inner::TileKind>;
-
-    fn tile(this: &Self, tile: Coords2d) -> <Self::TileKind as TileKind<IO>>::Tile<ES, NS> {
-        this.as_ref().map(|stage| Inner::tile(stage, tile))
+    fn tile(this: &Self, tile: Coords2d) -> Tilex<ES, NS, IO> {
+        #[comptime]
+        if let ComptimeOption::Some(inner) = this {
+            Inner::tile(inner, tile)
+        } else {
+            Tilex::new_None()
+        }
     }
 }
 
@@ -262,6 +262,5 @@ impl<IO: SliceVisibility, S: LoadStageFamily<IO>> LoadStageFamily<IO> for Option
 }
 
 impl<IO: SliceVisibility, Inner: StageFamily<IO>> StageFamily<IO> for Option<Inner> {
-    type TileKind = Option<Inner::TileKind>;
     type Stage<ES: Numeric, NS: Size, T: TilingLayout> = ComptimeOption<Inner::Stage<ES, NS, T>>;
 }

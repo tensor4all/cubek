@@ -20,7 +20,7 @@ use crate::{
             single_stage::simple::SimpleMatmulFamily,
         },
         stage::{ColMajorTilingOrder, PartitionBuffering, PlaneMatmulFamily, RowMajorTilingOrder},
-        tile::{StandardTileIO, TileMatmulFamily},
+        tile::TileMatmulFamily,
     },
     routines::{
         Routine,
@@ -74,7 +74,7 @@ impl Display for SimpleArgs {
 
 impl<TMM, RC, LL, RL, AL> Routine<RC> for SimpleAlgorithm<TMM, LL, RL, AL>
 where
-    TMM: TileMatmulFamily<TileIO = StandardTileIO>,
+    TMM: TileMatmulFamily,
     RC: RuntimeConfig,
     LL: FullLoadingStrategy<RC, TileKind = Strided>,
     RL: FullLoadingStrategy<RC, TileKind = Strided, SyncStrategy = LL::SyncStrategy>,

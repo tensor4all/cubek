@@ -2,6 +2,8 @@
 
 #[cfg(feature = "extended")]
 pub mod extended;
+#[cfg(feature = "extended")]
+pub mod quantization;
 
 mod launcher_routine;
 mod launcher_strategy;

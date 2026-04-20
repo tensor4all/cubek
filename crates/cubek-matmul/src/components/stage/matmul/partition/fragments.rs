@@ -1,6 +1,6 @@
+use crate::components::tile::Tilex;
 use crate::definition::{MatmulTypes, MatrixTypes};
 use crate::{
-    components::tile::TileIO,
     components::{stage::Stage, tile::TileMatmul},
     definition::{Acc, StageSize},
 };
@@ -14,11 +14,22 @@ pub struct Accumulators<
     MP: MatmulTypes,
     TM: TileMatmul<
             <MP::Lhs as MatrixTypes>::Register,
+            <MP::Lhs as MatrixTypes>::RegisterSize,
             <MP::Rhs as MatrixTypes>::Register,
+            <MP::Rhs as MatrixTypes>::RegisterSize,
             <MP::Acc as MatrixTypes>::Register,
+            <MP::Acc as MatrixTypes>::RegisterSize,
         >,
 > {
-    sequence: Sequence<TM::AccFragment>,
+    sequence: Sequence<
+        Tilex<
+            <MP::Acc as MatrixTypes>::Register,
+            <MP::Acc as MatrixTypes>::RegisterSize,
+            ReadWrite,
+        >,
+    >,
+    #[cube(comptime)]
+    _phantom: std::marker::PhantomData<TM>,
 }
 
 type StageTy<T> = crate::definition::Stage<T>;
@@ -28,8 +39,11 @@ impl<
     MP: MatmulTypes,
     TM: TileMatmul<
             <MP::Lhs as MatrixTypes>::Register,
+            <MP::Lhs as MatrixTypes>::RegisterSize,
             <MP::Rhs as MatrixTypes>::Register,
+            <MP::Rhs as MatrixTypes>::RegisterSize,
             <MP::Acc as MatrixTypes>::Register,
+            <MP::Acc as MatrixTypes>::RegisterSize,
         >,
 > Accumulators<MP, TM>
 {
@@ -48,18 +62,12 @@ impl<
 
         Accumulators::<MP, TM> {
             sequence: accumulators,
+            _phantom: std::marker::PhantomData,
         }
     }
 
     /// Load all accumulators from the specified stage
-    pub fn load<
-        R: Stage<
-                StageTy<Acc<MP>>,
-                StageSize<Acc<MP>>,
-                ReadOnly,
-                TileKind = <TM::TileIO as TileIO>::Acc,
-            >,
-    >(
+    pub fn load<R: Stage<StageTy<Acc<MP>>, StageSize<Acc<MP>>, ReadOnly>>(
         &mut self,
         stage: &R,
         #[comptime] tiles_in_stage_partition_m: usize,
@@ -83,7 +91,8 @@ impl<
         #[comptime] m: usize,
         #[comptime] n: usize,
         #[comptime] tiles_in_stage_partition_n: usize,
-    ) -> &TM::AccFragment {
+    ) -> &Tilex<<MP::Acc as MatrixTypes>::Register, <MP::Acc as MatrixTypes>::RegisterSize, ReadWrite>
+    {
         &self.sequence[m * tiles_in_stage_partition_n + n]
     }
 
@@ -93,7 +102,11 @@ impl<
         #[comptime] m: usize,
         #[comptime] n: usize,
         #[comptime] tiles_in_stage_partition_n: usize,
-    ) -> &mut TM::AccFragment {
+    ) -> &mut Tilex<
+        <MP::Acc as MatrixTypes>::Register,
+        <MP::Acc as MatrixTypes>::RegisterSize,
+        ReadWrite,
+    > {
         self.sequence.index_mut(m * tiles_in_stage_partition_n + n)
     }
 }

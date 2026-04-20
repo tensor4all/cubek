@@ -10,7 +10,7 @@ use crate::{
                 unit_partitioned::UnitPartitionedStageConfig,
             },
         },
-        tile::{TileConfig, TileIO, TileMatmul},
+        tile::{TileConfig, TileMatmul, Tilex},
     },
     definition::{MatmulTypes, MatrixTypes},
 };
@@ -115,32 +115,31 @@ pub struct PartitionedStageMatmul<
     MP: MatmulTypes,
     TM: TileMatmul<
             <MP::Lhs as MatrixTypes>::Register,
+            <MP::Lhs as MatrixTypes>::RegisterSize,
             <MP::Rhs as MatrixTypes>::Register,
+            <MP::Rhs as MatrixTypes>::RegisterSize,
             <MP::Acc as MatrixTypes>::Register,
+            <MP::Acc as MatrixTypes>::RegisterSize,
         >,
     StageLhs: Stage<
             <<MP as MatmulTypes>::Lhs as MatrixTypes>::Stage,
             <<MP as MatmulTypes>::Lhs as MatrixTypes>::StageSize,
             ReadOnly,
-            TileKind = <TM::TileIO as TileIO>::In,
         >,
     StageRhs: Stage<
             <<MP as MatmulTypes>::Rhs as MatrixTypes>::Stage,
             <<MP as MatmulTypes>::Rhs as MatrixTypes>::StageSize,
             ReadOnly,
-            TileKind = <TM::TileIO as TileIO>::In,
         >,
     StageAcc: Stage<
             <<MP as MatmulTypes>::Acc as MatrixTypes>::Stage,
             <<MP as MatmulTypes>::Acc as MatrixTypes>::StageSize,
             ReadOnly,
-            TileKind = <TM::TileIO as TileIO>::Acc,
         >,
     StageOut: Stage<
             <<MP as MatmulTypes>::Acc as MatrixTypes>::Stage,
             <<MP as MatmulTypes>::Acc as MatrixTypes>::StageSize,
             ReadWrite,
-            TileKind = <TM::TileIO as TileIO>::Out,
         >,
     SP: StagePartitioner,
 > {
@@ -155,32 +154,31 @@ where
     MP: MatmulTypes,
     TM: TileMatmul<
             <MP::Lhs as MatrixTypes>::Register,
+            <MP::Lhs as MatrixTypes>::RegisterSize,
             <MP::Rhs as MatrixTypes>::Register,
+            <MP::Rhs as MatrixTypes>::RegisterSize,
             <MP::Acc as MatrixTypes>::Register,
+            <MP::Acc as MatrixTypes>::RegisterSize,
         >,
     StageLhs: Stage<
             <<MP as MatmulTypes>::Lhs as MatrixTypes>::Stage,
             <<MP as MatmulTypes>::Lhs as MatrixTypes>::StageSize,
             ReadOnly,
-            TileKind = <TM::TileIO as TileIO>::In,
         >,
     StageRhs: Stage<
             <<MP as MatmulTypes>::Rhs as MatrixTypes>::Stage,
             <<MP as MatmulTypes>::Rhs as MatrixTypes>::StageSize,
             ReadOnly,
-            TileKind = <TM::TileIO as TileIO>::In,
         >,
     StageAcc: Stage<
             <<MP as MatmulTypes>::Acc as MatrixTypes>::Stage,
             <<MP as MatmulTypes>::Acc as MatrixTypes>::StageSize,
             ReadOnly,
-            TileKind = <TM::TileIO as TileIO>::Acc,
         >,
     StageOut: Stage<
             <<MP as MatmulTypes>::Acc as MatrixTypes>::Stage,
             <<MP as MatmulTypes>::Acc as MatrixTypes>::StageSize,
             ReadWrite,
-            TileKind = <TM::TileIO as TileIO>::Out,
         >,
     SP: StagePartitioner,
 {
@@ -192,8 +190,20 @@ where
     type OutStage = StageOut;
 
     type Accumulators = Accumulators<MP, TM>;
-    type LhsTile = Sequence<TM::LhsFragment>;
-    type RhsTile = RhsTile<TM::RhsFragment>;
+    type LhsTile = Sequence<
+        Tilex<
+            <MP::Lhs as MatrixTypes>::Register,
+            <MP::Lhs as MatrixTypes>::RegisterSize,
+            ReadWrite,
+        >,
+    >;
+    type RhsTile = RhsTile<
+        Tilex<
+            <MP::Rhs as MatrixTypes>::Register,
+            <MP::Rhs as MatrixTypes>::RegisterSize,
+            ReadWrite,
+        >,
+    >;
 
     fn execute(
         lhs_stage: &StageLhs,

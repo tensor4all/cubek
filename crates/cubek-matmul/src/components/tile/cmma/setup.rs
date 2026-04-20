@@ -1,4 +1,4 @@
-use crate::components::tile::{StandardTileIO, TileMatmulFamily};
+use crate::components::tile::TileMatmulFamily;
 use crate::{
     components::resource::CubeDimResource, components::tile::SharedTileConfig,
     components::tile::cmma::matmul::CmmaMatmul,
@@ -18,8 +18,7 @@ impl TileMatmulFamily for CmmaMatmul
 //     CmmaStageReader<Tile>: CmmaFragmentReader<TileKind = Tile>,
 {
     type Config = SharedTileConfig;
-    type Matmul<L: Numeric, R: Numeric, A: Numeric> = CmmaMatmul;
-    type TileIO = StandardTileIO;
+    type Matmul<L: Numeric, VL: Size, R: Numeric, VR: Size, A: Numeric, VA: Size> = CmmaMatmul;
 
     fn requires_accelerator() -> bool {
         true

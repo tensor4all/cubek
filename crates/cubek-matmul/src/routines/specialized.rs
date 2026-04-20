@@ -4,13 +4,11 @@ use cubecl::{Runtime, client::ComputeClient, features::MmaConfig};
 use cubek_std::{
     MatrixLayout,
     cube_count::{CubeCountStrategy, GlobalOrder, HypercubeBlueprint, SmAllocation},
-    tile::Strided,
 };
 
 use crate::components::{
     global::read::sync_full_strided::SyncFullStridedLoading,
     stage::{PlaneMatmulFamily, StageFamily},
-    tile::StandardTileIO,
 };
 use crate::definition::{
     MatmulProblem, MatmulSetupError, MatmulVectorSizes, SwizzleModes, TilingBlueprint,
@@ -65,10 +63,10 @@ impl From<()> for SpecializedStrategy {
 
 impl<TMM, RC, L, AL> base::Routine<RC> for SpecializedAlgorithm<TMM, L, AL>
 where
-    TMM: tile::TileMatmulFamily<TileIO = StandardTileIO>,
+    TMM: tile::TileMatmulFamily,
     RC: RuntimeConfig,
-    L: AsyncPartialLoadingStrategy<RC, Stage: StageFamily<TileKind = Strided>>,
-    AL: FullLoadingStrategy<RC, Stage: StageFamily<TileKind = Strided>>,
+    L: AsyncPartialLoadingStrategy<RC, Stage: StageFamily>,
+    AL: FullLoadingStrategy<RC, Stage: StageFamily>,
 {
     type Strategy = SpecializedStrategy;
     type BatchMatmul = PartitionedBatchMatmulFamily<

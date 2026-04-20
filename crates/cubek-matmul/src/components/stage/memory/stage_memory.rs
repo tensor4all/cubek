@@ -1,23 +1,17 @@
 use cubecl::prelude::*;
-use cubek_std::{
-    stage::StageMemoryConfig, stage::as_swizzle_object, tile::Strided, tile::StridedTile,
-};
+use cubek_std::{stage::StageMemoryConfig, stage::as_swizzle_object, tile::StridedTile};
 use std::marker::PhantomData;
 
-use crate::{
-    components::global::GlobalReaderConfig,
-    components::global::PlaneFlowPartition,
-    components::stage::Stage,
-    components::stage::{LoadStageFamily, TilingLayout},
-    components::{global::read::StageBuffer, stage::StageFamily},
+use crate::components::{
+    global::{GlobalReaderConfig, PlaneFlowPartition, read::StageBuffer},
+    stage::{LoadStageFamily, Stage, StageFamily, TilingLayout},
+    tile::Tilex,
 };
 use cubecl::std::{Swizzle, tensor::layout::Coords2d};
 
 pub struct StridedStageFamily;
 
 impl StageFamily for StridedStageFamily {
-    type TileKind = Strided;
-
     type Stage<ES: Numeric, NS: Size, T: TilingLayout> = StridedStageMemory<ES, NS, T>;
 }
 
@@ -207,10 +201,9 @@ impl<ES: Numeric, NS: Size, T: TilingLayout> StridedStageMemory<ES, NS, T> {
 impl<ES: Numeric, NS: Size, T: TilingLayout> Stage<ES, NS, ReadOnly>
     for StridedStageMemory<ES, NS, T>
 {
-    type TileKind = Strided;
-
-    fn tile(this: &Self, tile: Coords2d) -> StridedTile<ES, NS> {
-        this.get_tile(tile)
+    fn tile(this: &Self, tile: Coords2d) -> Tilex<ES, NS, ReadOnly> {
+        let strided_tile = this.get_tile(tile);
+        Tilex::new_SharedMemory(strided_tile)
     }
 }
 
@@ -218,10 +211,9 @@ impl<ES: Numeric, NS: Size, T: TilingLayout> Stage<ES, NS, ReadOnly>
 impl<ES: Numeric, NS: Size, T: TilingLayout> Stage<ES, NS, ReadWrite>
     for StridedStageMemory<ES, NS, T>
 {
-    type TileKind = Strided;
-
-    fn tile(this: &Self, tile: Coords2d) -> StridedTile<ES, NS, ReadWrite> {
-        this.get_tile_mut(tile)
+    fn tile(this: &Self, tile: Coords2d) -> Tilex<ES, NS, ReadWrite> {
+        let strided_tile = this.get_tile_mut(tile);
+        Tilex::new_SharedMemory(strided_tile)
     }
 }
 

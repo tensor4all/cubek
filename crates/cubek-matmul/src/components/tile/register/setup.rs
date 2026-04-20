@@ -1,4 +1,4 @@
-use crate::components::{resource::CubeDimResource, tile::StandardTileIO};
+use crate::components::resource::CubeDimResource;
 use crate::{
     components::tile::SharedTileConfig, components::tile::TileMatmulFamily,
     components::tile::register::config::RegisterMatmulConfig,
@@ -18,9 +18,7 @@ use cubek_std::{InvalidConfigError, MatrixLayout};
 
 impl TileMatmulFamily for RegisterMatmul {
     type Config = RegisterMatmulConfig;
-    type Matmul<L: Numeric, R: Numeric, A: Numeric> = RegisterMatmul;
-
-    type TileIO = StandardTileIO;
+    type Matmul<L: Numeric, NL: Size, R: Numeric, NR: Size, A: Numeric, NA: Size> = RegisterMatmul;
 
     fn requires_accelerator() -> bool {
         false

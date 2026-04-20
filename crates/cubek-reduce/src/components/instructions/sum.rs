@@ -1,5 +1,8 @@
-use super::{ReduceCoordinate, ReduceFamily, ReduceInstruction, ReduceRequirements};
-use crate::components::{instructions::ReduceStep, precision::ReducePrecision};
+use super::{ReduceFamily, ReduceInstruction, ReduceRequirements};
+use crate::components::{
+    instructions::{Accumulator, AccumulatorKind, Item, ReduceStep},
+    precision::ReducePrecision,
+};
 use cubecl::prelude::*;
 
 #[derive(Debug, CubeType, Clone)]
@@ -12,7 +15,6 @@ impl ReduceFamily for Sum {
 
 #[cube]
 impl<P: ReducePrecision> ReduceInstruction<P> for Sum {
-    type AccumulatorItem = Vector<P::EA, P::SI>;
     type SharedAccumulator = SharedMemory<Vector<P::EA, P::SI>>;
     type Config = ();
 
@@ -27,64 +29,71 @@ impl<P: ReducePrecision> ReduceInstruction<P> for Sum {
         Vector::empty().fill(P::EI::from_int(0))
     }
 
-    fn null_accumulator(_this: &Self) -> Self::AccumulatorItem {
-        Vector::empty().fill(P::EA::from_int(0))
+    fn null_accumulator(_this: &Self) -> Accumulator<P> {
+        Accumulator::<P> {
+            elements: AccumulatorKind::new_single(Vector::empty().fill(P::EA::from_int(0))),
+            args: AccumulatorKind::new_None(),
+        }
     }
 
-    fn assign_accumulator(
-        _this: &Self,
-        destination: &mut Self::AccumulatorItem,
-        source: &Self::AccumulatorItem,
-    ) {
-        *destination = *source;
-    }
-
-    fn read_accumulator(
-        _this: &Self,
-        accumulator: &Vector<P::EA, P::SI>,
-    ) -> (Vector<P::EI, P::SI>, ReduceCoordinate<P::SI>) {
-        (
-            Vector::cast_from(*accumulator),
-            ReduceCoordinate::new_NotRequired(),
-        )
+    fn assign_accumulator(_this: &Self, destination: &mut Accumulator<P>, source: &Accumulator<P>) {
+        destination.elements.assign(&source.elements);
     }
 
     fn reduce(
         _this: &Self,
-        accumulator: &Self::AccumulatorItem,
-        item: Vector<P::EI, P::SI>,
-        _coordinate: ReduceCoordinate<P::SI>,
-        #[comptime] plane_reduce: ReduceStep,
-    ) -> Self::AccumulatorItem {
-        match plane_reduce {
+        accumulator: &Accumulator<P>,
+        item: Item<P>,
+        #[comptime] reduce_step: ReduceStep,
+    ) -> Accumulator<P> {
+        let accumulator = &accumulator.elements.item();
+        let item = item.elements;
+        let elements = match reduce_step {
             ReduceStep::Plane => *accumulator + plane_sum(Vector::cast_from(item)),
             ReduceStep::Identity => *accumulator + Vector::cast_from(item),
+        };
+        Accumulator::<P> {
+            elements: AccumulatorKind::new_single(elements),
+            args: AccumulatorKind::new_None(),
         }
+    }
+
+    fn plane_reduce_inplace(_this: &Self, accumulator: &mut Accumulator<P>) {
+        let sum = plane_sum(Vector::cast_from(accumulator.elements.item()));
+        accumulator
+            .elements
+            .assign(&AccumulatorKind::new_single(sum));
     }
 
     fn fuse_accumulators(
         _this: &Self,
-        lhs: Self::AccumulatorItem,
-        rhs: Self::AccumulatorItem,
-    ) -> Self::AccumulatorItem {
-        lhs + rhs
+        lhs: &Accumulator<P>,
+        rhs: &Accumulator<P>,
+    ) -> Accumulator<P> {
+        let lhs = lhs.elements.item();
+        let rhs = rhs.elements.item();
+
+        Accumulator::<P> {
+            elements: AccumulatorKind::new_single(lhs + rhs),
+            args: AccumulatorKind::new_None(),
+        }
     }
 
     fn merge_vector<Out: Numeric>(
         _this: &Self,
-        accumulator: Self::AccumulatorItem,
+        accumulator: Accumulator<P>,
         _shape_axis_reduce: usize,
-    ) -> Out {
-        let sum = Vector::vector_sum(accumulator);
+    ) -> AccumulatorKind<Out> {
+        let sum = Vector::vector_sum(accumulator.elements.item());
 
-        Out::cast_from(sum)
+        AccumulatorKind::new_single(Out::cast_from(sum))
     }
 
     fn to_output_perpendicular<Out: Numeric>(
         _this: &Self,
-        accumulator: Self::AccumulatorItem,
+        accumulator: Accumulator<P>,
         _shape_axis_reduce: usize,
-    ) -> Vector<Out, P::SI> {
-        Vector::cast_from(accumulator)
+    ) -> AccumulatorKind<Vector<Out, P::SI>> {
+        AccumulatorKind::new_single(Vector::cast_from(accumulator.elements.item()))
     }
 }

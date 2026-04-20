@@ -2,7 +2,7 @@ use crate::{
     components::{
         resource::CubeDimResource,
         tile::{
-            SharedTileConfig, StandardTileIO, TileMatmulFamily,
+            SharedTileConfig, TileMatmulFamily,
             mma::{MmaMatmul, config::MmaMatmulConfig},
         },
     },
@@ -30,8 +30,7 @@ where
 {
     type Config = MmaMatmulConfig;
 
-    type Matmul<L: Numeric, R: Numeric, A: Numeric> = MmaMatmul;
-    type TileIO = StandardTileIO;
+    type Matmul<L: Numeric, NL: Size, R: Numeric, NR: Size, A: Numeric, NA: Size> = MmaMatmul;
 
     fn requires_accelerator() -> bool {
         true

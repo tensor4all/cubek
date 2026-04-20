@@ -3,7 +3,9 @@ use crate::{
     components::{
         args::NumericLine,
         global::idle_check,
-        instructions::{ReduceStep, SharedAccumulator, fuse_accumulator_inplace, reduce_inplace},
+        instructions::{
+            Accumulator, ReduceStep, SharedAccumulator, fuse_accumulator_inplace, reduce_inplace,
+        },
         readers::{Reader, cube::CubeReader},
         writer::Writer,
     },
@@ -130,31 +132,16 @@ impl GlobalFullCubeReduce {
         let mut accumulator = I::null_accumulator(inst);
 
         for i in 0..reader.length() {
-            let (item, coordinate) = reader.read(i);
-            reduce_inplace::<P, I>(
-                inst,
-                &mut accumulator,
-                item,
-                coordinate,
-                ReduceStep::Identity,
-            );
+            let item = reader.read(i);
+            reduce_inplace::<P, I>(inst, &mut accumulator, item, ReduceStep::Identity);
         }
 
         let worker_pos = Self::worker_pos(blueprint);
 
         let accumulator_plane = match blueprint.use_planes {
             true => {
-                // Sync at the plane level.
-                let (item, coordinate) = I::read_accumulator(inst, &accumulator);
-                let mut accumulator_plane = I::null_accumulator(inst);
-                reduce_inplace::<P, I>(
-                    inst,
-                    &mut accumulator_plane,
-                    item,
-                    coordinate,
-                    ReduceStep::Plane,
-                );
-                accumulator_plane
+                I::plane_reduce_inplace(inst, &mut accumulator);
+                accumulator
             }
             false => accumulator,
         };
@@ -177,13 +164,13 @@ impl GlobalFullCubeReduce {
 fn reduce_scan<P: ReducePrecision, I: ReduceInstruction<P>>(
     inst: &I,
     accumulator: &mut I::SharedAccumulator,
-    result: &mut I::AccumulatorItem,
+    result: &mut Accumulator<P>,
     #[comptime] size: usize,
 ) {
     for i in 0..size {
-        let item = I::SharedAccumulator::read(accumulator, i);
-        let (item, coordinate) = I::read_accumulator(inst, &item);
-        reduce_inplace::<P, I>(inst, result, item, coordinate, ReduceStep::Identity);
+        let acc = I::SharedAccumulator::read(accumulator, i);
+        let fused = I::fuse_accumulators(inst, result, &acc);
+        I::assign_accumulator(inst, result, &fused);
     }
 }
 
@@ -215,7 +202,7 @@ fn reduce_scan<P: ReducePrecision, I: ReduceInstruction<P>>(
 fn reduce_tree<P: ReducePrecision, I: ReduceInstruction<P>>(
     inst: &I,
     accumulator: &mut I::SharedAccumulator,
-    result: &mut I::AccumulatorItem,
+    result: &mut Accumulator<P>,
     worker_index: usize,
     #[comptime] size: usize,
 ) {
@@ -248,7 +235,7 @@ fn reduce_tree<P: ReducePrecision, I: ReduceInstruction<P>>(
     }
     sync_cube();
 
-    let tmp = I::SharedAccumulator::read(accumulator, 0);
-    let (item, coordinate) = I::read_accumulator(inst, &tmp);
-    reduce_inplace::<P, I>(inst, result, item, coordinate, ReduceStep::Identity);
+    let acc = I::SharedAccumulator::read(accumulator, 0);
+    let fused = I::fuse_accumulators(inst, result, &acc);
+    I::assign_accumulator(inst, result, &fused);
 }

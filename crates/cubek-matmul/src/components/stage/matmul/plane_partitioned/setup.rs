@@ -1,7 +1,6 @@
 use crate::components::stage::matmul::plane_partitioned::{
     PlaneMatmul, PlanePartitionedStageConfig,
 };
-use crate::components::tile::TileIO;
 use crate::components::{
     CubeDimResource,
     global::{MatmulPlaneCounts, PartitionedStage, PartitionedStageFamily, PlaneFlowConfig},
@@ -24,7 +23,6 @@ use core::marker::PhantomData;
 use cubecl::{ir::DeviceProperties, prelude::*};
 use cubek_std::{
     stage::StageMemoryConfig,
-    tile::Strided,
     {InvalidConfigError, MatrixLayout},
 };
 
@@ -41,12 +39,8 @@ pub struct PlaneMatmulFamily<
     _phantom: PhantomData<(TM, StageLhs, StageRhs, StageAcc)>,
 }
 
-impl<
-    TM: TileMatmulFamily<TileIO: TileIO<Out = Strided>>,
-    StageLhs: StageFamily<TileKind = <TM::TileIO as TileIO>::In>,
-    StageRhs: StageFamily<TileKind = <TM::TileIO as TileIO>::In>,
-    StageAcc: StageFamily<TileKind = <TM::TileIO as TileIO>::Acc>,
-> StageMatmulFamily for PlaneMatmulFamily<TM, StageLhs, StageRhs, StageAcc>
+impl<TM: TileMatmulFamily, StageLhs: StageFamily, StageRhs: StageFamily, StageAcc: StageFamily>
+    StageMatmulFamily for PlaneMatmulFamily<TM, StageLhs, StageRhs, StageAcc>
 {
     type LhsStage = StageLhs;
     type RhsStage = StageRhs;
@@ -63,8 +57,11 @@ impl<
         MP,
         TM::Matmul<
             <MP::Lhs as MatrixTypes>::Register,
+            <MP::Lhs as MatrixTypes>::RegisterSize,
             <MP::Rhs as MatrixTypes>::Register,
+            <MP::Rhs as MatrixTypes>::RegisterSize,
             <MP::Acc as MatrixTypes>::Register,
+            <MP::Acc as MatrixTypes>::RegisterSize,
         >,
         StageLhs::Stage<STy<Lhs<MP>>, SSz<Lhs<MP>>, TL>,
         StageRhs::Stage<STy<Rhs<MP>>, SSz<Rhs<MP>>, TR>,

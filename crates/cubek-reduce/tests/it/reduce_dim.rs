@@ -11,9 +11,9 @@ pub fn test_argmin() {
 }
 
 #[test]
+#[ignore = "Arg Top k not yet implemented"]
 pub fn test_argtopk() {
-    // argtopk is not yet implemented
-    // test_case().test_argtopk(1);
+    test_case().test_argtopk(3);
 }
 
 #[test]
@@ -31,12 +31,21 @@ pub fn test_prod() {
     test_case().test_prod();
 }
 
-fn test_case() -> TestCase<TestDType> {
-    TestCase::<TestDType> {
-        shape: test_shape(),
-        stride: test_strides(),
-        axis: test_axis(),
-        strategy: test_strategy(),
-        elem: core::marker::PhantomData,
-    }
+#[test]
+pub fn test_min() {
+    test_case().test_min();
+}
+
+#[test]
+pub fn test_max() {
+    test_case().test_max();
+}
+
+#[test]
+pub fn test_max_abs() {
+    test_case().test_max_abs();
+}
+
+fn test_case() -> TestCase {
+    TestCase::new::<TestDType>(test_shape(), test_strides(), test_axis(), test_strategy())
 }
