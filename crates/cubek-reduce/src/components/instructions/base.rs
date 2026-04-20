@@ -127,25 +127,19 @@ pub trait ReduceInstruction<P: ReducePrecision>:
     /// is guaranteed to return `accumulator` unchanged.
     fn null_accumulator(this: &Self) -> Accumulator<P>;
 
-    /// Assign the value of `source` into `destination`.
-    /// In spirit, this is equivalent to `destination = source;`,
-    /// but this syntax is not currently supported by CubeCL.
-    fn assign_accumulator(this: &Self, destination: &mut Accumulator<P>, source: &Accumulator<P>);
-
     /// If `ReduceStep` is `Plane`, reduce all the `item` and `coordinate` within the `accumulator`.
     /// if `ReduceStep` is `Identity`, reduce the given `item` and `coordinate` into the accumulator.
     fn reduce(
         this: &Self,
-        accumulator: &Accumulator<P>,
+        accumulator: &mut Accumulator<P>,
         item: Item<P>,
         #[comptime] reduce_step: ReduceStep,
-    ) -> Accumulator<P>;
+    );
 
     fn plane_reduce_inplace(this: &Self, accumulator: &mut Accumulator<P>);
 
-    /// Reduce two accumulators into a single accumulator.
-    fn fuse_accumulators(this: &Self, lhs: &Accumulator<P>, rhs: &Accumulator<P>)
-    -> Accumulator<P>;
+    /// Reduce a whole accumulator (other) in accumulator.
+    fn fuse_accumulators(this: &Self, accumulator: &mut Accumulator<P>, other: &Accumulator<P>);
 
     /// Reduce all elements of the accumulator into a single output element of type `Out`.
     fn merge_vector<Out: Numeric>(
@@ -259,8 +253,7 @@ pub fn reduce_inplace<P: ReducePrecision, R: ReduceInstruction<P>>(
     item: Item<P>,
     #[comptime] reduce_step: ReduceStep,
 ) {
-    let reduction = &R::reduce(inst, accumulator, item, reduce_step);
-    R::assign_accumulator(inst, accumulator, reduction);
+    R::reduce(inst, accumulator, item, reduce_step)
 }
 
 #[cube]
@@ -271,9 +264,9 @@ pub fn reduce_shared_inplace<P: ReducePrecision, R: ReduceInstruction<P>>(
     item: Item<P>,
     #[comptime] reduce_step: ReduceStep,
 ) {
-    let acc_item = R::SharedAccumulator::read(accumulator, index);
-    let reduction = R::reduce(inst, &acc_item, item, reduce_step);
-    R::SharedAccumulator::write(accumulator, index, reduction);
+    let mut acc_item = R::SharedAccumulator::read(accumulator, index);
+    R::reduce(inst, &mut acc_item, item, reduce_step);
+    R::SharedAccumulator::write(accumulator, index, acc_item);
 }
 
 #[cube]
@@ -283,10 +276,11 @@ pub fn fuse_accumulator_inplace<P: ReducePrecision, R: ReduceInstruction<P>>(
     destination: usize,
     origin: usize,
 ) {
-    let fused = R::fuse_accumulators(
+    let mut acc = R::SharedAccumulator::read(accumulator, destination);
+    R::fuse_accumulators(
         inst,
-        &R::SharedAccumulator::read(accumulator, destination),
+        &mut acc,
         &R::SharedAccumulator::read(accumulator, origin),
     );
-    R::SharedAccumulator::write(accumulator, destination, fused);
+    R::SharedAccumulator::write(accumulator, destination, acc);
 }

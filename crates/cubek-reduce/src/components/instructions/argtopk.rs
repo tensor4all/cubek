@@ -84,17 +84,12 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ArgTopK {
         }
     }
 
-    fn assign_accumulator(_this: &Self, destination: &mut Accumulator<P>, source: &Accumulator<P>) {
-        destination.elements.assign(&source.elements);
-        destination.args.assign(&source.args);
-    }
-
     fn reduce(
         this: &Self,
-        accumulator: &Accumulator<P>,
+        accumulator: &mut Accumulator<P>,
         item: Item<P>,
         #[comptime] reduce_step: ReduceStep,
-    ) -> Accumulator<P> {
+    ) {
         todo!()
 
         // let coordinate = item.args.item();
@@ -153,11 +148,7 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ArgTopK {
         todo!()
     }
 
-    fn fuse_accumulators(
-        _this: &Self,
-        _lhs: &Accumulator<P>,
-        _rhs: &Accumulator<P>,
-    ) -> Accumulator<P> {
+    fn fuse_accumulators(_this: &Self, _accumulator: &mut Accumulator<P>, _other: &Accumulator<P>) {
         todo!("fuse_accumulator Not implemented")
     }
 

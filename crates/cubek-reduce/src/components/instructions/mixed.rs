@@ -238,19 +238,12 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ReduceOperation {
         }
     }
 
-    #[allow(unused_mut)]
-    #[allow(unused_mut)]
-    fn assign_accumulator(_this: &Self, destination: &mut Accumulator<P>, source: &Accumulator<P>) {
-        destination.elements.assign(&source.elements);
-        destination.args.assign(&source.args);
-    }
-
     fn reduce(
         this: &Self,
-        accumulator: &Accumulator<P>,
+        accumulator: &mut Accumulator<P>,
         item: Item<P>,
         #[comptime] reduce_step: ReduceStep,
-    ) -> Accumulator<P> {
+    ) {
         match this {
             ReduceOperation::Sum(sum) => {
                 <Sum as ReduceInstruction<P>>::reduce(sum, accumulator, item, reduce_step)
@@ -314,38 +307,34 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ReduceOperation {
         }
     }
 
-    fn fuse_accumulators(
-        this: &Self,
-        lhs: &Accumulator<P>,
-        rhs: &Accumulator<P>,
-    ) -> Accumulator<P> {
+    fn fuse_accumulators(this: &Self, accumulator: &mut Accumulator<P>, other: &Accumulator<P>) {
         match this {
             ReduceOperation::Sum(sum) => {
-                <Sum as ReduceInstruction<P>>::fuse_accumulators(sum, lhs, rhs)
+                <Sum as ReduceInstruction<P>>::fuse_accumulators(sum, accumulator, other)
             }
             ReduceOperation::Prod(prod) => {
-                <Prod as ReduceInstruction<P>>::fuse_accumulators(prod, lhs, rhs)
+                <Prod as ReduceInstruction<P>>::fuse_accumulators(prod, accumulator, other)
             }
             ReduceOperation::Mean(mean) => {
-                <Mean as ReduceInstruction<P>>::fuse_accumulators(mean, lhs, rhs)
+                <Mean as ReduceInstruction<P>>::fuse_accumulators(mean, accumulator, other)
             }
             ReduceOperation::MaxAbs(maxabs) => {
-                <MaxAbs as ReduceInstruction<P>>::fuse_accumulators(maxabs, lhs, rhs)
+                <MaxAbs as ReduceInstruction<P>>::fuse_accumulators(maxabs, accumulator, other)
             }
             ReduceOperation::ArgMax(argmax) => {
-                <ArgMax as ReduceInstruction<P>>::fuse_accumulators(argmax, lhs, rhs)
+                <ArgMax as ReduceInstruction<P>>::fuse_accumulators(argmax, accumulator, other)
             }
             ReduceOperation::ArgMin(argmin) => {
-                <ArgMin as ReduceInstruction<P>>::fuse_accumulators(argmin, lhs, rhs)
+                <ArgMin as ReduceInstruction<P>>::fuse_accumulators(argmin, accumulator, other)
             }
             ReduceOperation::ArgTopK(argtopk) => {
-                <ArgTopK as ReduceInstruction<P>>::fuse_accumulators(argtopk, lhs, rhs)
+                <ArgTopK as ReduceInstruction<P>>::fuse_accumulators(argtopk, accumulator, other)
             }
             ReduceOperation::Max(max) => {
-                <Max as ReduceInstruction<P>>::fuse_accumulators(max, lhs, rhs)
+                <Max as ReduceInstruction<P>>::fuse_accumulators(max, accumulator, other)
             }
             ReduceOperation::Min(min) => {
-                <Min as ReduceInstruction<P>>::fuse_accumulators(min, lhs, rhs)
+                <Min as ReduceInstruction<P>>::fuse_accumulators(min, accumulator, other)
             }
         }
     }

@@ -39,36 +39,31 @@ impl<P: ReducePrecision> ReduceInstruction<P> for Max {
         }
     }
 
-    fn assign_accumulator(_this: &Self, destination: &mut Accumulator<P>, source: &Accumulator<P>) {
-        destination.elements.assign(&source.elements);
-    }
-
     fn reduce(
         _this: &Self,
-        accumulator: &Accumulator<P>,
+        accumulator: &mut Accumulator<P>,
         item: Item<P>,
         #[comptime] reduce_step: ReduceStep,
-    ) -> Accumulator<P> {
-        let accumulator = accumulator.elements.item();
+    ) {
+        let accumulator_item = accumulator.elements.item();
         let elements = match reduce_step {
             ReduceStep::Plane => {
                 let candidate_item = Vector::cast_from(plane_max(item.elements));
                 select_many(
-                    accumulator.greater_than(candidate_item),
-                    accumulator,
+                    accumulator_item.greater_than(candidate_item),
+                    accumulator_item,
                     candidate_item,
                 )
             }
             ReduceStep::Identity => {
                 let item = Vector::cast_from(item.elements);
-                select_many(accumulator.greater_than(item), accumulator, item)
+                select_many(accumulator_item.greater_than(item), accumulator_item, item)
             }
         };
 
-        Accumulator::<P> {
-            elements: AccumulatorKind::new_single(elements),
-            args: AccumulatorKind::new_None(),
-        }
+        accumulator
+            .elements
+            .assign(&AccumulatorKind::new_single(elements));
     }
 
     fn plane_reduce_inplace(_this: &Self, accumulator: &mut Accumulator<P>) {
@@ -84,17 +79,17 @@ impl<P: ReducePrecision> ReduceInstruction<P> for Max {
             .assign(&AccumulatorKind::new_single(max));
     }
 
-    fn fuse_accumulators(
-        _this: &Self,
-        lhs: &Accumulator<P>,
-        rhs: &Accumulator<P>,
-    ) -> Accumulator<P> {
-        let lhs = lhs.elements.item();
-        let rhs = rhs.elements.item();
-        Accumulator::<P> {
-            elements: AccumulatorKind::new_single(select_many(lhs.greater_than(rhs), lhs, rhs)),
-            args: AccumulatorKind::new_None(),
-        }
+    fn fuse_accumulators(_this: &Self, accumulator: &mut Accumulator<P>, other: &Accumulator<P>) {
+        let accumulator_item = accumulator.elements.item();
+        let other_item = other.elements.item();
+
+        accumulator
+            .elements
+            .assign(&AccumulatorKind::new_single(select_many(
+                accumulator_item.greater_than(other_item),
+                accumulator_item,
+                other_item,
+            )));
     }
 
     fn merge_vector<Out: Numeric>(

@@ -40,16 +40,12 @@ impl<P: ReducePrecision> ReduceInstruction<P> for Mean {
         <Sum as ReduceInstruction<P>>::null_accumulator(&this.sum)
     }
 
-    fn assign_accumulator(this: &Self, destination: &mut Accumulator<P>, source: &Accumulator<P>) {
-        <Sum as ReduceInstruction<P>>::assign_accumulator(&this.sum, destination, source);
-    }
-
     fn reduce(
         this: &Self,
-        accumulator: &Accumulator<P>,
+        accumulator: &mut Accumulator<P>,
         item: Item<P>,
         #[comptime] reduce_step: ReduceStep,
-    ) -> Accumulator<P> {
+    ) {
         <Sum as ReduceInstruction<P>>::reduce(&this.sum, accumulator, item, reduce_step)
     }
 
@@ -57,12 +53,8 @@ impl<P: ReducePrecision> ReduceInstruction<P> for Mean {
         <Sum as ReduceInstruction<P>>::plane_reduce_inplace(&this.sum, accumulator)
     }
 
-    fn fuse_accumulators(
-        this: &Self,
-        lhs: &Accumulator<P>,
-        rhs: &Accumulator<P>,
-    ) -> Accumulator<P> {
-        <Sum as ReduceInstruction<P>>::fuse_accumulators(&this.sum, lhs, rhs)
+    fn fuse_accumulators(this: &Self, accumulator: &mut Accumulator<P>, other: &Accumulator<P>) {
+        <Sum as ReduceInstruction<P>>::fuse_accumulators(&this.sum, accumulator, other)
     }
 
     fn merge_vector<Out: Numeric>(

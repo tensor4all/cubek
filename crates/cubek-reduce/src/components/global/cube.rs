@@ -163,14 +163,13 @@ impl GlobalFullCubeReduce {
 #[cube]
 fn reduce_scan<P: ReducePrecision, I: ReduceInstruction<P>>(
     inst: &I,
-    accumulator: &mut I::SharedAccumulator,
-    result: &mut Accumulator<P>,
+    shared_accumulator: &mut I::SharedAccumulator,
+    accumulator: &mut Accumulator<P>,
     #[comptime] size: usize,
 ) {
     for i in 0..size {
-        let acc = I::SharedAccumulator::read(accumulator, i);
-        let fused = I::fuse_accumulators(inst, result, &acc);
-        I::assign_accumulator(inst, result, &fused);
+        let acc = I::SharedAccumulator::read(shared_accumulator, i);
+        I::fuse_accumulators(inst, accumulator, &acc);
     }
 }
 
@@ -201,8 +200,8 @@ fn reduce_scan<P: ReducePrecision, I: ReduceInstruction<P>>(
 #[cube]
 fn reduce_tree<P: ReducePrecision, I: ReduceInstruction<P>>(
     inst: &I,
-    accumulator: &mut I::SharedAccumulator,
-    result: &mut Accumulator<P>,
+    shared_accumulator: &mut I::SharedAccumulator,
+    accumulator: &mut Accumulator<P>,
     worker_index: usize,
     #[comptime] size: usize,
 ) {
@@ -214,7 +213,7 @@ fn reduce_tree<P: ReducePrecision, I: ReduceInstruction<P>>(
             let destination = jump * 2 * worker_index;
             let origin = jump * (2 * worker_index + 1);
             if worker_index < num_active_units {
-                fuse_accumulator_inplace::<P, I>(inst, accumulator, destination, origin);
+                fuse_accumulator_inplace::<P, I>(inst, shared_accumulator, destination, origin);
             }
             jump *= 2;
             sync_cube();
@@ -226,7 +225,7 @@ fn reduce_tree<P: ReducePrecision, I: ReduceInstruction<P>>(
             let destination = jump * 2 * worker_index;
             let origin = jump * (2 * worker_index + 1);
             if worker_index < num_remaining_items / 2 {
-                fuse_accumulator_inplace::<P, I>(inst, accumulator, destination, origin);
+                fuse_accumulator_inplace::<P, I>(inst, shared_accumulator, destination, origin);
             }
             num_remaining_items = num_remaining_items.div_ceil(2);
             jump *= 2;
@@ -235,7 +234,6 @@ fn reduce_tree<P: ReducePrecision, I: ReduceInstruction<P>>(
     }
     sync_cube();
 
-    let acc = I::SharedAccumulator::read(accumulator, 0);
-    let fused = I::fuse_accumulators(inst, result, &acc);
-    I::assign_accumulator(inst, result, &fused);
+    let acc = I::SharedAccumulator::read(shared_accumulator, 0);
+    I::fuse_accumulators(inst, accumulator, &acc);
 }

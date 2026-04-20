@@ -36,26 +36,22 @@ impl<P: ReducePrecision> ReduceInstruction<P> for Sum {
         }
     }
 
-    fn assign_accumulator(_this: &Self, destination: &mut Accumulator<P>, source: &Accumulator<P>) {
-        destination.elements.assign(&source.elements);
-    }
-
     fn reduce(
         _this: &Self,
-        accumulator: &Accumulator<P>,
+        accumulator: &mut Accumulator<P>,
         item: Item<P>,
         #[comptime] reduce_step: ReduceStep,
-    ) -> Accumulator<P> {
-        let accumulator = &accumulator.elements.item();
+    ) {
+        let accumulator_item = &accumulator.elements.item();
         let item = item.elements;
         let elements = match reduce_step {
-            ReduceStep::Plane => *accumulator + plane_sum(Vector::cast_from(item)),
-            ReduceStep::Identity => *accumulator + Vector::cast_from(item),
+            ReduceStep::Plane => *accumulator_item + plane_sum(Vector::cast_from(item)),
+            ReduceStep::Identity => *accumulator_item + Vector::cast_from(item),
         };
-        Accumulator::<P> {
-            elements: AccumulatorKind::new_single(elements),
-            args: AccumulatorKind::new_None(),
-        }
+
+        accumulator
+            .elements
+            .assign(&AccumulatorKind::new_single(elements));
     }
 
     fn plane_reduce_inplace(_this: &Self, accumulator: &mut Accumulator<P>) {
@@ -65,18 +61,13 @@ impl<P: ReducePrecision> ReduceInstruction<P> for Sum {
             .assign(&AccumulatorKind::new_single(sum));
     }
 
-    fn fuse_accumulators(
-        _this: &Self,
-        lhs: &Accumulator<P>,
-        rhs: &Accumulator<P>,
-    ) -> Accumulator<P> {
-        let lhs = lhs.elements.item();
-        let rhs = rhs.elements.item();
+    fn fuse_accumulators(_this: &Self, accumulator: &mut Accumulator<P>, other: &Accumulator<P>) {
+        let accumulator_item = accumulator.elements.item();
+        let other_item = other.elements.item();
 
-        Accumulator::<P> {
-            elements: AccumulatorKind::new_single(lhs + rhs),
-            args: AccumulatorKind::new_None(),
-        }
+        accumulator
+            .elements
+            .assign(&AccumulatorKind::new_single(accumulator_item + other_item));
     }
 
     fn merge_vector<Out: Numeric>(

@@ -61,17 +61,12 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ArgMin {
         }
     }
 
-    fn assign_accumulator(_this: &Self, destination: &mut Accumulator<P>, source: &Accumulator<P>) {
-        destination.elements.assign(&source.elements);
-        destination.args.assign(&source.args);
-    }
-
     fn reduce(
         _this: &Self,
-        accumulator: &Accumulator<P>,
+        accumulator: &mut Accumulator<P>,
         item: Item<P>,
         #[comptime] reduce_step: ReduceStep,
-    ) -> Accumulator<P> {
+    ) {
         let coordinate = item.args.item();
         let item = item.elements;
 
@@ -92,10 +87,10 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ArgMin {
             candidate_coordinate,
         );
 
-        Accumulator::<P> {
-            elements: AccumulatorKind::new_single(elements),
-            args: AccumulatorKind::new_single(args),
-        }
+        accumulator
+            .elements
+            .assign(&AccumulatorKind::new_single(elements));
+        accumulator.args.assign(&AccumulatorKind::new_single(args));
     }
 
     fn plane_reduce_inplace(_this: &Self, accumulator: &mut Accumulator<P>) {
@@ -118,22 +113,18 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ArgMin {
         accumulator.args.assign(&AccumulatorKind::new_single(args));
     }
 
-    fn fuse_accumulators(
-        _this: &Self,
-        lhs: &Accumulator<P>,
-        rhs: &Accumulator<P>,
-    ) -> Accumulator<P> {
+    fn fuse_accumulators(_this: &Self, accumulator: &mut Accumulator<P>, other: &Accumulator<P>) {
         let (elements, args) = Self::choose_argmin(
-            lhs.elements.item(),
-            lhs.args.item(),
-            rhs.elements.item(),
-            rhs.args.item(),
+            accumulator.elements.item(),
+            accumulator.args.item(),
+            other.elements.item(),
+            other.args.item(),
         );
 
-        Accumulator::<P> {
-            elements: AccumulatorKind::new_single(elements),
-            args: AccumulatorKind::new_single(args),
-        }
+        accumulator
+            .elements
+            .assign(&AccumulatorKind::new_single(elements));
+        accumulator.args.assign(&AccumulatorKind::new_single(args));
     }
 
     fn merge_vector<Out: Numeric>(
