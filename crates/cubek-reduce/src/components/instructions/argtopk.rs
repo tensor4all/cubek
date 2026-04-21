@@ -138,8 +138,39 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ArgTopK {
         todo!()
     }
 
-    fn fuse_accumulators(_this: &Self, _accumulator: &mut Accumulator<P>, _other: &Accumulator<P>) {
-        todo!("fuse_accumulator Not implemented")
+    fn fuse_accumulators(this: &Self, accumulator: &mut Accumulator<P>, other: &Accumulator<P>) {
+        let acc_elements = accumulator.elements.multiple_mut();
+        let acc_args = accumulator.args.multiple_mut();
+
+        let other_elements = other.elements.multiple();
+        let other_args = other.args.multiple();
+
+        for i in 0..this.k {
+            let mut item = other_elements[i];
+            let mut coordinate = other_args[i];
+
+            for j in 0..this.k {
+                let current_item = acc_elements[j];
+                let current_coord = acc_args[j];
+
+                let keep0 = select_many(
+                    current_item.equal(item),
+                    current_coord.less_than(coordinate),
+                    current_item.greater_than(item),
+                );
+
+                let new_top_item = select_many(keep0, current_item, item);
+                let new_top_coord = select_many(keep0, current_coord, coordinate);
+                let new_rest_item = select_many(keep0, item, current_item);
+                let new_rest_coord = select_many(keep0, coordinate, current_coord);
+
+                acc_elements[j] = new_top_item;
+                acc_args[j] = new_top_coord;
+
+                item = new_rest_item;
+                coordinate = new_rest_coord;
+            }
+        }
     }
 
     fn to_output_parallel<Out: Numeric>(
@@ -182,7 +213,6 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ArgTopK {
         accumulator: Accumulator<P>,
         _shape_axis_reduce: usize,
     ) -> Value<Vector<Out, P::SI>> {
-
         let acc_args = accumulator.args.multiple();
         let mut output = Array::new(this.k);
 
