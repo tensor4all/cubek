@@ -178,10 +178,18 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ArgTopK {
     }
 
     fn to_output_perpendicular<Out: Numeric>(
-        _this: &Self,
-        _accumulator: Accumulator<P>,
+        this: &Self,
+        accumulator: Accumulator<P>,
         _shape_axis_reduce: usize,
     ) -> Value<Vector<Out, P::SI>> {
-        todo!("to_output_perpendicular Not implemented")
+
+        let acc_args = accumulator.args.multiple();
+        let mut output = Array::new(this.k);
+
+        for i in 0..this.k {
+            output[i] = Vector::cast_from(acc_args[i]);
+        }
+
+        Value::new_Multiple(output)
     }
 }
