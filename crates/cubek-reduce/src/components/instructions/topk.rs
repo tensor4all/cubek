@@ -77,6 +77,7 @@ impl<P: ReducePrecision> ReduceInstruction<P> for TopK {
 
     fn null_accumulator(this: &Self) -> Accumulator<P> {
         let mut elements = Array::new(comptime!(this.k as usize));
+        #[unroll]
         for i in 0..this.k {
             elements[i] = Vector::new(P::EA::min_value());
         }
@@ -105,6 +106,7 @@ impl<P: ReducePrecision> ReduceInstruction<P> for TopK {
         let elements = accumulator.elements.multiple_mut();
         let mut item = Vector::cast_from(candidate_item);
 
+        #[unroll]
         for k_iter in 0..this.k {
             let current_item = elements[k_iter];
 
@@ -134,11 +136,18 @@ impl<P: ReducePrecision> ReduceInstruction<P> for TopK {
         let vector_size = accumulators[0].size().comptime();
 
         let mut topk = Array::new(this.k);
+        #[unroll]
+        for slot in 0..this.k {
+            topk[slot] = Out::min_value();
+        }
 
+        #[unroll]
         for i in 0..this.k {
+            #[unroll]
             for j in 0..vector_size {
                 let mut element = Out::cast_from(accumulators[i as usize][j]);
 
+                #[unroll]
                 for slot in 0..this.k {
                     let current = topk[slot as usize];
 
@@ -158,11 +167,10 @@ impl<P: ReducePrecision> ReduceInstruction<P> for TopK {
         accumulator: Accumulator<P>,
         _shape_axis_reduce: usize,
     ) -> Value<Vector<Out, P::SI>> {
-        // TODO if Out==P::EA, return acc_values directly
-
         let acc_values = accumulator.elements.multiple();
         let mut output = Array::new(this.k);
 
+        #[unroll]
         for i in 0..this.k {
             output[i] = Vector::cast_from(acc_values[i]);
         }

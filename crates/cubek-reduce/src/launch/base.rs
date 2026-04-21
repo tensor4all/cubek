@@ -52,7 +52,7 @@ pub(crate) fn launch_reduce<Run: Runtime>(
         _ => VectorizationMode::Perpendicular,
     };
 
-    let out_vec_axis = output_vectorization_axis(&input.strides);
+    let out_vec_axis = output_vectorization_axis(&input.strides, vectorization_mode);
 
     let (vector_size_input, vector_size_output) = generate_vector_size::<Run>(
         client,
