@@ -1,7 +1,7 @@
 use crate::{
     ReduceInstruction, ReducePrecision, VectorizationMode,
     components::{
-        args::NumericLine,
+        args::NumericVector,
         global::idle_check,
         instructions::{
             Accumulator, ReduceStep, SharedAccumulator, fuse_accumulator_inplace, reduce_inplace,
@@ -18,10 +18,11 @@ pub struct GlobalFullCubeReduce;
 
 #[cube]
 impl GlobalFullCubeReduce {
-    pub fn execute<P: ReducePrecision, Out: NumericLine, I: ReduceInstruction<P>>(
+    pub fn execute<P: ReducePrecision, Out: NumericVector, I: ReduceInstruction<P>>(
         input: &VirtualTensor<P::EI, P::SI>,
         output: &mut VirtualTensor<Out::T, Out::N, ReadWrite>,
         reduce_axis: usize,
+        out_vec_axis: usize,
         inst: &I,
         #[comptime] vectorization_mode: VectorizationMode,
         #[comptime] blueprint: CubeBlueprint,
@@ -35,6 +36,7 @@ impl GlobalFullCubeReduce {
             input,
             output,
             reduce_axis,
+            out_vec_axis,
             write_index,
             vectorization_mode,
             I::accumulator_format(inst),
@@ -113,7 +115,7 @@ impl GlobalFullCubeReduce {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn reduce_shared<P: ReducePrecision, Out: NumericLine, I: ReduceInstruction<P>>(
+    fn reduce_shared<P: ReducePrecision, Out: NumericVector, I: ReduceInstruction<P>>(
         input: &VirtualTensor<P::EI, P::SI>,
         output: &mut VirtualTensor<Out::T, Out::N, ReadWrite>,
         reduce_axis: usize,

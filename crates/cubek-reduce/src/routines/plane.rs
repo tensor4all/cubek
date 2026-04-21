@@ -104,7 +104,7 @@ fn generate_blueprint<R: Runtime>(
 
     let plane_idle = cube_launched * cube_dim.num_elems() as usize != working_units;
     let work_size = match settings.vectorization_mode {
-        VectorizationMode::Parallel(_) => problem.vector_size / settings.vector_size_input,
+        VectorizationMode::Parallel => problem.vector_size / settings.vector_size_input,
         VectorizationMode::Perpendicular => problem.vector_size,
     };
     let bound_checks = match work_size.is_multiple_of(plane_size as usize) {
@@ -146,7 +146,7 @@ fn generate_blueprint<R: Runtime>(
 
 fn working_planes(settings: &ReduceVectorSettings, problem: &ReduceProblem) -> usize {
     match settings.vectorization_mode {
-        VectorizationMode::Parallel(_) => problem.vector_count / settings.vector_size_output,
+        VectorizationMode::Parallel => problem.vector_count / settings.vector_size_output,
         VectorizationMode::Perpendicular => problem.vector_count / settings.vector_size_input,
     }
 }

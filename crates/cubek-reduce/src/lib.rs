@@ -97,14 +97,14 @@ pub fn reduce<R: Runtime>(
     dtypes: ReduceDtypes,
 ) -> Result<(), ReduceError> {
     validate_axis(input.shape.len(), axis)?;
-    valid_output_shape(
+    validate_shapes(
         &input.shape,
         &output.shape,
         axis,
-        if let ReduceOperationConfig::ArgTopK(k) = operation {
-            Some(k as usize)
-        } else {
-            None
+        match operation {
+            ReduceOperationConfig::ArgTopK(k) => Some(k as usize),
+            ReduceOperationConfig::TopK(k) => Some(k as usize),
+            _ => None,
         },
     )?;
 
@@ -120,16 +120,25 @@ fn validate_axis(rank: usize, axis: usize) -> Result<(), ReduceError> {
 }
 
 // Check that the output shape match the input shape with the given axis set to 1.
-fn valid_output_shape(
+fn validate_shapes(
     input_shape: &[usize],
     output_shape: &[usize],
     axis: usize,
-    reduced_length: Option<usize>,
+    k: Option<usize>,
 ) -> Result<(), ReduceError> {
     let mut expected_shape = input_shape.to_vec();
-    expected_shape[axis] = reduced_length.unwrap_or(1);
+    let k = k.unwrap_or(1);
+
+    if expected_shape[axis] < k {
+        return Err(ReduceError::ReduceAxisTooSmall {
+            axis_length: expected_shape[axis],
+            k,
+        });
+    }
+
+    expected_shape[axis] = k;
     if output_shape != expected_shape {
-        return Err(ReduceError::MismatchShape {
+        return Err(ReduceError::MismatchOutputShape {
             expected_shape,
             output_shape: output_shape.to_vec(),
         });

@@ -1,4 +1,4 @@
-use crate::{IdleMode, ReducePrecision, VectorizationMode, components::args::NumericLine};
+use crate::{IdleMode, ReducePrecision, VectorizationMode, components::args::NumericVector};
 use cubecl::{prelude::*, std::tensor::r#virtual::VirtualTensor};
 
 #[cube]
@@ -8,13 +8,13 @@ pub(crate) fn reduce_count(
     #[comptime] input_vector_size: VectorSize,
 ) -> usize {
     match vectorization_mode {
-        VectorizationMode::Parallel(_) => output_size,
+        VectorizationMode::Parallel => output_size,
         VectorizationMode::Perpendicular => output_size / input_vector_size,
     }
 }
 
 #[cube]
-pub fn idle_check<P: ReducePrecision, Out: NumericLine>(
+pub fn idle_check<P: ReducePrecision, Out: NumericVector>(
     input: &VirtualTensor<P::EI, P::SI>,
     output: &mut VirtualTensor<Out::T, Out::N, ReadWrite>,
     reduce_index_start: usize,

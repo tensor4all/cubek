@@ -18,6 +18,7 @@ use cubek_test_utils::{
 use crate::it::reference::{
     contiguous_strides, reference_argmax, reference_argmin, reference_argtopk, reference_max,
     reference_max_abs, reference_mean, reference_min, reference_prod, reference_sum,
+    reference_topk,
 };
 
 pub struct TestCase {
@@ -148,6 +149,15 @@ impl TestCase {
         );
     }
 
+    pub fn test_topk(&self, k: usize) {
+        self.run_reduce_test(
+            move |input, axis| reference_topk(input, axis, k),
+            self.input_dtype,
+            ReduceOperationConfig::TopK(k),
+            1e-7,
+        );
+    }
+
     fn run_reduce_test(
         &self,
         reference: impl FnOnce(&HostData, usize) -> HostData,
@@ -158,7 +168,17 @@ impl TestCase {
         let client = TestRuntime::client(&Default::default());
         let axis = self.axis.unwrap();
 
-        let (input_handle, input_host) = self.setup_input(&client);
+        let (input_handle, input_host) = TestInput::new(
+            client.clone(),
+            self.shape.clone(),
+            self.input_dtype,
+            StrideSpec::Custom(self.stride.iter().copied().collect()),
+            DataKind::Random {
+                seed: 1234,
+                distribution: cubek_test_utils::Distribution::Uniform(-1., 1.),
+            },
+        )
+        .generate_with_f32_host_data();
 
         let expected = cast_host_through_dtype(reference(&input_host, axis), output_dtype);
 
@@ -215,7 +235,7 @@ impl TestCase {
         let axis = self.axis.unwrap();
         let is_parallel = self.stride[axis] == 1;
         let strides = match config {
-            ReduceOperationConfig::ArgTopK(k) if is_parallel => {
+            ReduceOperationConfig::ArgTopK(k) | ReduceOperationConfig::TopK(k) if is_parallel => {
                 parallel_multiple_output_strides(self.shape.as_slice(), &self.stride, axis, *k)
             }
             _ => contiguous_strides(output_shape.as_slice()),
@@ -230,80 +250,46 @@ impl TestCase {
         .generate()
     }
 
-    /// Build the device tensor and a matching logical-layout host reference.
-    ///
-    /// The host reference uses contiguous strides over the original shape so
-    /// reference functions can iterate with plain logical coordinates. Broadcast
-    /// inputs (stride == 0) are safe because [`logical_input_data`] produces the
-    /// same value for every logical coordinate that maps to the same physical
-    /// offset.
-    fn setup_input(
-        &self,
-        client: &cubecl::client::ComputeClient<TestRuntime>,
-    ) -> (TensorHandle<TestRuntime>, HostData) {
-        let logical_data = self.logical_input_data();
+    // /// Deterministic values at each logical coordinate.
+    // ///
+    // /// Values are drawn from `{±0.125, ±0.25, …, ±1.0}` — all magnitudes ≤ 1,
+    // /// so the product of any subset is bounded and cannot overflow f32 under
+    // /// any reduction order (needed for `test_prod` on long axes).
+    // ///
+    // /// For broadcast dims (stride == 0) we zero the coord before hashing so
+    // /// every logical index mapping to the same physical offset yields the
+    // /// same value — required for the device-side scatter to be well defined.
+    // fn logical_input_data(&self) -> Vec<f32> {
+    //     let shape = self.shape.as_slice();
+    //     let rank = shape.len();
+    //     let num_logical: usize = shape.iter().product();
+    //     let mut data = Vec::with_capacity(num_logical);
+    //     let mut coord = vec![0usize; rank];
 
-        let tensor_handle = TestInput::new(
-            client.clone(),
-            self.shape.clone(),
-            self.input_dtype,
-            StrideSpec::Custom(self.stride.iter().copied().collect()),
-            DataKind::Custom {
-                data: logical_data.clone(),
-            },
-        )
-        .generate();
+    //     for linear in 0..num_logical {
+    //         let mut rem = linear;
+    //         for d in (0..rank).rev() {
+    //             coord[d] = rem % shape[d];
+    //             rem /= shape[d];
+    //         }
+    //         for d in 0..rank {
+    //             if self.stride[d] == 0 {
+    //                 coord[d] = 0;
+    //             }
+    //         }
 
-        let host_values = round_trip_to_f32(&logical_data, self.input_dtype);
-        let host = HostData {
-            data: HostDataVec::F32(host_values),
-            shape: self.shape.clone(),
-            strides: contiguous_strides(self.shape.as_slice()),
-        };
+    //         let mut hash: usize = 0;
+    //         for (d, c) in coord.iter().enumerate() {
+    //             hash = hash.wrapping_add(c.wrapping_mul(d.wrapping_add(31)));
+    //         }
+    //         let h = hash % 16;
+    //         let magnitude = (h / 2 + 1) as f32 * 0.125;
+    //         let sign = if h % 2 == 0 { 1.0 } else { -1.0 };
+    //         data.push(sign * magnitude);
+    //     }
 
-        (tensor_handle, host)
-    }
-
-    /// Deterministic values at each logical coordinate.
-    ///
-    /// Values are drawn from `{±0.125, ±0.25, …, ±1.0}` — all magnitudes ≤ 1,
-    /// so the product of any subset is bounded and cannot overflow f32 under
-    /// any reduction order (needed for `test_prod` on long axes).
-    ///
-    /// For broadcast dims (stride == 0) we zero the coord before hashing so
-    /// every logical index mapping to the same physical offset yields the
-    /// same value — required for the device-side scatter to be well defined.
-    fn logical_input_data(&self) -> Vec<f32> {
-        let shape = self.shape.as_slice();
-        let rank = shape.len();
-        let num_logical: usize = shape.iter().product();
-        let mut data = Vec::with_capacity(num_logical);
-        let mut coord = vec![0usize; rank];
-
-        for linear in 0..num_logical {
-            let mut rem = linear;
-            for d in (0..rank).rev() {
-                coord[d] = rem % shape[d];
-                rem /= shape[d];
-            }
-            for d in 0..rank {
-                if self.stride[d] == 0 {
-                    coord[d] = 0;
-                }
-            }
-
-            let mut hash: usize = 0;
-            for (d, c) in coord.iter().enumerate() {
-                hash = hash.wrapping_add(c.wrapping_mul(d.wrapping_add(31)));
-            }
-            let h = hash % 16;
-            let magnitude = (h / 2 + 1) as f32 * 0.125;
-            let sign = if h % 2 == 0 { 1.0 } else { -1.0 };
-            data.push(sign * magnitude);
-        }
-
-        data
-    }
+    //     data
+    // }
 }
 
 /// Output strides for multiple accumulators (like argtopk) in parallel mode.
@@ -319,7 +305,7 @@ fn parallel_multiple_output_strides(
     let v = (0..rank)
         .filter(|&d| d != reduce_axis)
         .min_by_key(|&d| input_strides[d])
-        .expect("parallel argtopk requires at least 2 axes");
+        .unwrap_or(0);
     let size_v = input_shape[v];
 
     let mut out = vec![0usize; rank];
@@ -332,21 +318,6 @@ fn parallel_multiple_output_strides(
         out[d] = input_strides[d] * k / size_r;
     }
     Strides::new(&out)
-}
-
-fn round_trip_to_f32(data: &[f32], dtype: StorageType) -> Vec<f32> {
-    match dtype {
-        StorageType::Scalar(ElemType::Float(FloatKind::F32)) => data.to_vec(),
-        StorageType::Scalar(ElemType::Float(FloatKind::F16)) => data
-            .iter()
-            .map(|&x| half::f16::from_f32(x).to_f32())
-            .collect(),
-        StorageType::Scalar(ElemType::Float(FloatKind::BF16)) => data
-            .iter()
-            .map(|&x| half::bf16::from_f32(x).to_f32())
-            .collect(),
-        other => panic!("Unsupported input dtype for reduce tests: {other:?}"),
-    }
 }
 
 /// Cast expected values through the GPU output dtype so comparisons account for

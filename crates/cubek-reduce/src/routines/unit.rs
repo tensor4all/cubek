@@ -100,7 +100,7 @@ fn generate_blueprint<R: Runtime>(
 
 fn working_units(settings: &ReduceVectorSettings, problem: &ReduceProblem) -> usize {
     match settings.vectorization_mode {
-        VectorizationMode::Parallel(_) => problem.vector_count / settings.vector_size_output,
+        VectorizationMode::Parallel => problem.vector_count / settings.vector_size_output,
         VectorizationMode::Perpendicular => problem.vector_count / settings.vector_size_input,
     }
 }

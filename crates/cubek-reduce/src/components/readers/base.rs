@@ -1,7 +1,7 @@
 use crate::{
     BoundChecks, ReduceInstruction, ReducePrecision, VectorizationMode,
     components::{
-        args::NumericLine,
+        args::NumericVector,
         instructions::{ReduceRequirements, Value},
         readers::{parallel::ParallelReader, perpendicular::PerpendicularReader},
     },
@@ -17,7 +17,7 @@ pub enum Reader<P: ReducePrecision> {
 #[cube]
 impl<P: ReducePrecision> Reader<P> {
     #[allow(clippy::too_many_arguments)]
-    pub fn new<I: ReduceInstruction<P>, Out: NumericLine>(
+    pub fn new<I: ReduceInstruction<P>, Out: NumericVector>(
         input: &VirtualTensor<P::EI, P::SI>,
         output: &mut VirtualTensor<Out::T, Out::N, ReadWrite>,
         inst: &I,
@@ -34,7 +34,7 @@ impl<P: ReducePrecision> Reader<P> {
             CUBE_DIM_X
         };
         match vectorization_mode {
-            VectorizationMode::Parallel(_) => {
+            VectorizationMode::Parallel => {
                 Reader::<P>::new_Parallel(ParallelReader::<P>::new::<I, Out>(
                     input,
                     output,
@@ -89,7 +89,7 @@ pub(crate) fn fill_coordinate_vector<N: Size>(
     #[comptime] vectorization_mode: VectorizationMode,
 ) -> Vector<u32, N> {
     match vectorization_mode {
-        VectorizationMode::Parallel(_) => {
+        VectorizationMode::Parallel => {
             let mut coordinates = Vector::empty();
             #[unroll]
             for j in 0..N::value() {

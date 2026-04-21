@@ -16,6 +16,16 @@ pub fn test_argtopk() {
 }
 
 #[test]
+pub fn test_topk_3() {
+    test_case().test_topk(3);
+}
+
+#[test]
+pub fn test_topk_5() {
+    test_case().test_topk(5);
+}
+
+#[test]
 pub fn test_mean() {
     test_case().test_mean();
 }

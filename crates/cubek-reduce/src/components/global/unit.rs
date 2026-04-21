@@ -1,7 +1,7 @@
 use crate::{
     BoundChecks, ReduceInstruction, ReducePrecision, VectorizationMode,
     components::{
-        args::NumericLine,
+        args::NumericVector,
         global::idle_check,
         instructions::{Accumulator, ReduceStep, reduce_inplace},
         readers::{Reader, unit::UnitReader},
@@ -16,10 +16,11 @@ pub struct GlobalFullUnitReduce;
 
 #[cube]
 impl GlobalFullUnitReduce {
-    pub fn execute<P: ReducePrecision, Out: NumericLine, I: ReduceInstruction<P>>(
+    pub fn execute<P: ReducePrecision, Out: NumericVector, I: ReduceInstruction<P>>(
         input: &VirtualTensor<P::EI, P::SI>,
         output: &mut VirtualTensor<Out::T, Out::N, ReadWrite>,
         reduce_axis: usize,
+        out_vec_axis: usize,
         inst: &I,
         #[comptime] vectorization_mode: VectorizationMode,
         #[comptime] blueprint: UnitReduceBlueprint,
@@ -30,6 +31,7 @@ impl GlobalFullUnitReduce {
             input,
             output,
             reduce_axis,
+            out_vec_axis,
             write_index,
             vectorization_mode,
             I::accumulator_format(inst),
@@ -64,7 +66,7 @@ impl GlobalFullUnitReduce {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn reduce_single<P: ReducePrecision, Out: NumericLine, I: ReduceInstruction<P>>(
+    pub fn reduce_single<P: ReducePrecision, Out: NumericVector, I: ReduceInstruction<P>>(
         input: &VirtualTensor<P::EI, P::SI>,
         output: &mut VirtualTensor<Out::T, Out::N, ReadWrite>,
         reduce_axis: usize,

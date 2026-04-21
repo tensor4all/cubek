@@ -127,15 +127,10 @@ impl HostData {
     }
 
     pub fn pretty_print(&self) -> String {
-        assert!(
-            self.shape.rank() == 2,
-            "pretty_print only supports 2D tensors"
-        );
-
-        let [rows, cols] = self.shape.dims();
+        let (rows, cols) = rows_cols(&self.shape);
 
         pretty_print_table(rows, cols, |row, col| {
-            let idx = self.strided_index(&[row, col]);
+            let idx = self.strided_index_2d(row, col);
 
             match &self.data {
                 HostDataVec::I32(_) => self.data.get_i32(idx).to_string(),
@@ -144,26 +139,36 @@ impl HostData {
             }
         })
     }
+
+    fn strided_index_2d(&self, row: usize, col: usize) -> usize {
+        match self.shape.rank() {
+            1 => self.strided_index(&[col]),
+            2 => self.strided_index(&[row, col]),
+            r => panic!("pretty_print only supports 1D and 2D tensors, got rank {r}"),
+        }
+    }
 }
 
 pub fn pretty_print_zip(tensors: &[&HostData]) -> String {
     assert!(!tensors.is_empty(), "Need at least one tensor");
 
-    let [rows, cols] = tensors[0].shape.dims();
+    let dims = tensors[0].shape.as_slice();
 
     for t in tensors {
         assert_eq!(
-            t.shape.dims(),
-            [rows, cols],
+            t.shape.as_slice(),
+            dims,
             "All tensors must have same shape"
         );
     }
+
+    let (rows, cols) = rows_cols(&tensors[0].shape);
 
     pretty_print_table(rows, cols, |row, col| {
         let mut parts = Vec::with_capacity(tensors.len());
 
         for t in tensors {
-            let idx = t.strided_index(&[row, col]);
+            let idx = t.strided_index_2d(row, col);
 
             let val = match &t.data {
                 HostDataVec::I32(_) => t.data.get_i32(idx).to_string(),
@@ -176,6 +181,17 @@ pub fn pretty_print_zip(tensors: &[&HostData]) -> String {
 
         parts.join("/")
     })
+}
+
+fn rows_cols(shape: &Shape) -> (usize, usize) {
+    match shape.rank() {
+        1 => (1, shape.as_slice()[0]),
+        2 => {
+            let d = shape.as_slice();
+            (d[0], d[1])
+        }
+        r => panic!("pretty_print only supports 1D and 2D tensors, got rank {r}"),
+    }
 }
 
 fn pretty_print_table<F>(rows: usize, cols: usize, mut cell: F) -> String
