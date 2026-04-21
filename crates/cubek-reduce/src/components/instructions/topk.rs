@@ -121,8 +121,23 @@ impl<P: ReducePrecision> ReduceInstruction<P> for TopK {
         todo!()
     }
 
-    fn fuse_accumulators(_this: &Self, _accumulator: &mut Accumulator<P>, _other: &Accumulator<P>) {
-        todo!("fuse_accumulator Not implemented")
+    fn fuse_accumulators(this: &Self, accumulator: &mut Accumulator<P>, other: &Accumulator<P>) {
+        let acc_elements = accumulator.elements.multiple_mut();
+        let other_elements = other.elements.multiple();
+
+        for i in 0..this.k {
+            let mut item = other_elements[i];
+            for j in 0..this.k {
+                let current_item = acc_elements[j];
+                let keep = current_item.greater_than(item);
+
+                let new_top_item = select_many(keep, current_item, item);
+                let new_rest_item = select_many(keep, item, current_item);
+
+                acc_elements[j] = new_top_item;
+                item = new_rest_item;
+            }
+        }
     }
 
     fn to_output_parallel<Out: Numeric>(
