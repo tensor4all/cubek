@@ -76,7 +76,7 @@ impl<P: ReducePrecision> ReduceInstruction<P> for TopK {
     }
 
     fn null_accumulator(this: &Self) -> Accumulator<P> {
-        let mut elements = Array::new(comptime!(this.k as usize));
+        let mut elements = Array::new(comptime!(this.k));
         for i in 0..this.k {
             elements[i] = Vector::new(P::EA::min_value());
         }
@@ -137,14 +137,14 @@ impl<P: ReducePrecision> ReduceInstruction<P> for TopK {
 
         for i in 0..this.k {
             for j in 0..vector_size {
-                let mut element = Out::cast_from(accumulators[i as usize][j]);
+                let mut element = Out::cast_from(accumulators[i][j]);
 
                 for slot in 0..this.k {
-                    let current = topk[slot as usize];
+                    let current = topk[slot];
 
                     let keep = current > element;
 
-                    topk[slot as usize] = select(keep, current, element);
+                    topk[slot] = select(keep, current, element);
                     element = select(keep, element, current);
                 }
             }
