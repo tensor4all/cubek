@@ -1,12 +1,15 @@
 use crate::{
     components::global::PlaneFlowPartition, components::global::PlaneFlowPartitionRule,
     components::stage::matmul::partitioned_matmul::PartitionedStageMatmul,
-    components::stage::matmul::partitioned_matmul::StagePartitioner, components::tile::TileMatmul,
-    definition::MatmulTypes, definition::MatrixTypes,
+    components::stage::matmul::partitioned_matmul::StagePartitioner,
+    components::tile_matmul::TileMatmul, definition::MatmulTypes, definition::MatrixTypes,
 };
 use cubecl::{prelude::*, std::tensor::layout::Coords2d};
 
-use crate::components::{stage::matmul::partition::SharedPartitionMatmulConfig, tile::TileConfig};
+use crate::components::{
+    stage::matmul::partition::SharedPartitionMatmulConfig,
+    tile_matmul::{Plane, TileConfig},
+};
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 /// Configuration for the plane partitioned stage matmul
@@ -31,6 +34,7 @@ pub type PlaneMatmul<
             <MP::Rhs as MatrixTypes>::RegisterSize,
             <MP::Acc as MatrixTypes>::Register,
             <MP::Acc as MatrixTypes>::RegisterSize,
+            Scope = Plane,
         >,
     StageLhs,
     StageRhs,

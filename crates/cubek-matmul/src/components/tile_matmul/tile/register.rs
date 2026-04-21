@@ -1,24 +1,21 @@
 use cubecl::prelude::*;
 use cubek_std::{MatrixLayout, tile::StridedTile};
 
-use crate::components::tile::{ProductType, SharedTileConfig, TileConfig};
+use crate::components::tile_matmul::tile::Scope;
+use crate::components::tile_matmul::{ProductType, SharedTileConfig, TileConfig};
 use crate::definition::StageIdent;
 
-use super::{RegisterTile, Tilex};
+use super::{RegisterTile, Tile};
 
 pub(crate) const UNROLL: bool = false;
 
-// ===========================================================================
-// Allocate
-// ===========================================================================
-
 #[cube]
-pub fn register_allocate_lhs<L: Numeric, VL: Size>(
+pub fn register_allocate_lhs<L: Numeric, VL: Size, Sc: Scope>(
     #[comptime] layout: MatrixLayout,
     #[comptime] config: SharedTileConfig,
     #[comptime] product_type: ProductType,
-) -> Tilex<L, VL, ReadWrite> {
-    Tilex::new_Register(RegisterTile::<L> {
+) -> Tile<L, VL, Sc, ReadWrite> {
+    Tile::new_Register(RegisterTile::<L> {
         data: Array::new((config.elements_in_tile_m() * config.elements_in_tile_k()) as usize),
         matrix_layout: layout,
         config,
@@ -27,12 +24,12 @@ pub fn register_allocate_lhs<L: Numeric, VL: Size>(
 }
 
 #[cube]
-pub fn register_allocate_rhs<R: Numeric, VR: Size>(
+pub fn register_allocate_rhs<R: Numeric, VR: Size, Sc: Scope>(
     #[comptime] layout: MatrixLayout,
     #[comptime] config: SharedTileConfig,
     #[comptime] product_type: ProductType,
-) -> Tilex<R, VR, ReadWrite> {
-    Tilex::new_Register(RegisterTile::<R> {
+) -> Tile<R, VR, Sc, ReadWrite> {
+    Tile::new_Register(RegisterTile::<R> {
         data: Array::new((config.elements_in_tile_n() * config.elements_in_tile_k()) as usize),
         matrix_layout: layout,
         config,
@@ -41,22 +38,18 @@ pub fn register_allocate_rhs<R: Numeric, VR: Size>(
 }
 
 #[cube]
-pub fn register_allocate_acc<A: Numeric, VA: Size>(
+pub fn register_allocate_acc<A: Numeric, VA: Size, Sc: Scope>(
     #[comptime] layout: MatrixLayout,
     #[comptime] config: SharedTileConfig,
     #[comptime] product_type: ProductType,
-) -> Tilex<A, VA, ReadWrite> {
-    Tilex::new_Register(RegisterTile::<A> {
+) -> Tile<A, VA, Sc, ReadWrite> {
+    Tile::new_Register(RegisterTile::<A> {
         data: Array::new((config.elements_in_tile_m() * config.elements_in_tile_n()) as usize),
         matrix_layout: layout,
         config,
         product_type,
     })
 }
-
-// ===========================================================================
-// Execute: (Register, Register, Register)
-// ===========================================================================
 
 #[cube]
 pub fn register_execute<L: Numeric, R: Numeric, A: Numeric>(
@@ -125,13 +118,9 @@ fn outer_product<L: Numeric, R: Numeric, A: Numeric>(
     }
 }
 
-// ===========================================================================
-// Load: SharedMemory -> Register
-// ===========================================================================
-
 #[cube]
-pub fn register_load_from_shared<E: Numeric, ES: Size, N: Numeric, V: Size>(
-    shared: &StridedTile<E, ES, ReadOnly>,
+pub fn register_load_from_shared<E: Numeric, ES: Size, N: Numeric, V: Size, IO: SliceVisibility>(
+    shared: &StridedTile<E, ES, IO>,
     arr: &mut Array<N>,
     #[comptime] matrix_layout: MatrixLayout,
     #[comptime] config: SharedTileConfig,
@@ -146,45 +135,45 @@ pub fn register_load_from_shared<E: Numeric, ES: Size, N: Numeric, V: Size>(
         StageIdent::Lhs => match product_type {
             ProductType::Inner => match matrix_layout {
                 MatrixLayout::RowMajor => {
-                    load_plain::<E, ES, N>(shared, arr, m, k);
+                    load_plain::<E, ES, N, IO>(shared, arr, m, k);
                 }
                 MatrixLayout::ColMajor => {
-                    load_transposed::<E, ES, N>(shared, arr, k, m);
+                    load_transposed::<E, ES, N, IO>(shared, arr, k, m);
                 }
             },
             ProductType::Outer => match matrix_layout {
                 MatrixLayout::RowMajor => {
-                    load_transposed::<E, ES, N>(shared, arr, m, k);
+                    load_transposed::<E, ES, N, IO>(shared, arr, m, k);
                 }
                 MatrixLayout::ColMajor => {
-                    load_plain::<E, ES, N>(shared, arr, k, m);
+                    load_plain::<E, ES, N, IO>(shared, arr, k, m);
                 }
             },
         },
         StageIdent::Rhs => match product_type {
             ProductType::Inner => match matrix_layout {
                 MatrixLayout::RowMajor => {
-                    load_transposed::<E, ES, N>(shared, arr, k, n);
+                    load_transposed::<E, ES, N, IO>(shared, arr, k, n);
                 }
                 MatrixLayout::ColMajor => {
-                    load_plain::<E, ES, N>(shared, arr, n, k);
+                    load_plain::<E, ES, N, IO>(shared, arr, n, k);
                 }
             },
             ProductType::Outer => match matrix_layout {
                 MatrixLayout::RowMajor => {
-                    load_plain::<E, ES, N>(shared, arr, k, n);
+                    load_plain::<E, ES, N, IO>(shared, arr, k, n);
                 }
                 MatrixLayout::ColMajor => {
-                    load_transposed::<E, ES, N>(shared, arr, n, k);
+                    load_transposed::<E, ES, N, IO>(shared, arr, n, k);
                 }
             },
         },
         StageIdent::Acc => match matrix_layout {
             MatrixLayout::RowMajor => {
-                load_plain::<E, ES, N>(shared, arr, m, n);
+                load_plain::<E, ES, N, IO>(shared, arr, m, n);
             }
             MatrixLayout::ColMajor => {
-                load_transposed::<E, ES, N>(shared, arr, n, m);
+                load_transposed::<E, ES, N, IO>(shared, arr, n, m);
             }
         },
         _ => panic!("Invalid ident for Register load"),
@@ -192,8 +181,8 @@ pub fn register_load_from_shared<E: Numeric, ES: Size, N: Numeric, V: Size>(
 }
 
 #[cube]
-fn load_plain<E: Numeric, ES: Size, N: Numeric>(
-    tile: &StridedTile<E, ES, ReadOnly>,
+fn load_plain<E: Numeric, ES: Size, N: Numeric, IO: SliceVisibility>(
+    tile: &StridedTile<E, ES, IO>,
     arr: &mut Array<N>,
     #[comptime] num_segments: u32,
     #[comptime] segment_size: u32,
@@ -216,8 +205,8 @@ fn load_plain<E: Numeric, ES: Size, N: Numeric>(
 }
 
 #[cube]
-fn load_transposed<E: Numeric, ES: Size, N: Numeric>(
-    tile: &StridedTile<E, ES, ReadOnly>,
+fn load_transposed<E: Numeric, ES: Size, N: Numeric, IO: SliceVisibility>(
+    tile: &StridedTile<E, ES, IO>,
     arr: &mut Array<N>,
     #[comptime] num_segments: u32,
     #[comptime] segment_size: u32,
@@ -239,10 +228,6 @@ fn load_transposed<E: Numeric, ES: Size, N: Numeric>(
     }
 }
 
-// ===========================================================================
-// Load: None -> Register (zero fill)
-// ===========================================================================
-
 #[cube]
 pub fn register_load_zeros<N: Numeric, V: Size>(
     arr: &mut Array<N>,
@@ -260,10 +245,6 @@ pub fn register_load_zeros<N: Numeric, V: Size>(
         arr[i as usize] = N::from_int(0);
     }
 }
-
-// ===========================================================================
-// Write: Register -> SharedMemory
-// ===========================================================================
 
 #[cube]
 pub fn register_write_to_shared<E: Numeric, ES: Size, A: Numeric, VA: Size>(

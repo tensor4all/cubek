@@ -1,31 +1,44 @@
-use crate::components::tile::TileMatmulFamily;
 use crate::{
-    components::resource::CubeDimResource, components::tile::SharedTileConfig,
-    components::tile::cmma::matmul::CmmaMatmul,
-};
-use crate::{
-    definition::{MatmulAvailabilityError, MatmulSetupError, MatmulVectorSizes},
-    definition::{MatmulElems, TilingBlueprint},
+    components::{
+        resource::CubeDimResource,
+        tile_matmul::{
+            Plane, SharedTileConfig, TileMatmulFamily,
+            mma::{MmaMatmul, config::MmaMatmulConfig},
+        },
+    },
+    definition::{
+        MatmulAvailabilityError, MatmulElems, MatmulSetupError, MatmulVectorSizes, TilingBlueprint,
+    },
 };
 use cubecl::{
     {features::MmaConfig, ir::DeviceProperties},
     {ir::StorageType, prelude::*},
 };
-use cubek_std::{InvalidConfigError, TileSize};
+use cubek_std::{
+    InvalidConfigError, TileSize,
+    tile::{
+        Strided,
+        mma::{MmaFragmentReader, MmaIOConfig, MmaStageReader},
+    },
+};
 
-impl TileMatmulFamily for CmmaMatmul
-// where
-//     CmmaStageReader<Tile>: CmmaFragmentReader<TileKind = Tile>,
+impl TileMatmulFamily for MmaMatmul
+where
+    MmaStageReader<Strided>: MmaFragmentReader<TileKind = Strided>,
+    MmaStageReader<Strided>: MmaFragmentReader<TileKind = Strided>,
+    MmaStageReader<Option<Strided>>: MmaFragmentReader<TileKind = Option<Strided>>,
 {
-    type Config = SharedTileConfig;
-    type Matmul<L: Numeric, VL: Size, R: Numeric, VR: Size, A: Numeric, VA: Size> = CmmaMatmul;
+    type Config = MmaMatmulConfig;
+    type Scope = Plane;
+
+    type Matmul<L: Numeric, NL: Size, R: Numeric, NR: Size, A: Numeric, NA: Size> = MmaMatmul;
 
     fn requires_accelerator() -> bool {
         true
     }
 
     fn can_cast_stage_element() -> bool {
-        false
+        true
     }
 
     fn cubedim_resource() -> Result<CubeDimResource, InvalidConfigError> {
@@ -33,25 +46,34 @@ impl TileMatmulFamily for CmmaMatmul
     }
 
     fn expand_config(
-        _device_props: &DeviceProperties,
+        device_props: &DeviceProperties,
         blueprint: &TilingBlueprint,
-        _dtypes: &MatmulElems,
+        dtypes: &MatmulElems,
         _vector_sizes: &MatmulVectorSizes,
-    ) -> Result<SharedTileConfig, MatmulSetupError> {
-        Ok(SharedTileConfig::new(
-            blueprint.tiling_scheme.tile_size,
-            blueprint.plane_dim,
-            blueprint.swizzle_modes,
-        ))
+    ) -> Result<Self::Config, MatmulSetupError> {
+        Ok(MmaMatmulConfig {
+            shared: SharedTileConfig {
+                tile_size: blueprint.tiling_scheme.tile_size,
+                plane_dim: blueprint.plane_dim,
+                swizzle_modes: blueprint.swizzle_modes,
+            },
+            mma_io_config: MmaIOConfig::new(
+                device_props,
+                dtypes.lhs_stage,
+                dtypes.rhs_stage,
+                dtypes.acc_stage,
+            ),
+        })
     }
 
-    fn should_swizzle<R: Runtime>(_client: &ComputeClient<R>) -> bool {
-        // Unsupported
-        false
+    fn should_swizzle<R: Runtime>(client: &ComputeClient<R>) -> bool {
+        // No alignment means swizzling can't be properly used, since it needs to be applied to
+        // the address, and alignment guarantees the offset is aligned to the pattern repeat.
+        client.properties().features.alignment
     }
 
     fn is_supported<R: Runtime>(client: &ComputeClient<R>, config: MmaConfig) -> bool {
-        client.properties().features.matmul.cmma.contains(&config)
+        client.properties().features.matmul.mma.contains(&config)
     }
 
     fn supported_sizes<R: Runtime>(
@@ -64,7 +86,7 @@ impl TileMatmulFamily for CmmaMatmul
             .properties()
             .features
             .matmul
-            .cmma
+            .mma
             .iter()
             .filter(|it| it.a_type == lhs_ty && it.b_type == rhs_ty && it.cd_type == acc_ty)
             .map(|it| (it.m, it.n, it.k).into())
@@ -86,7 +108,7 @@ impl TileMatmulFamily for CmmaMatmul
             .properties()
             .features
             .matmul
-            .cmma
+            .mma
             .contains(&MmaConfig {
                 a_type: lhs,
                 b_type: rhs,
@@ -104,12 +126,6 @@ impl TileMatmulFamily for CmmaMatmul
                     size: Some(TileSize::new(size.m(), size.n(), size.k())),
                 },
             ));
-        }
-
-        if blueprint.swizzle_modes.has_swizzle() {
-            return Err(MatmulSetupError::InvalidConfig(Box::new(
-                "This tile matmul doesn't support swizzling",
-            )));
         }
 
         Ok(())

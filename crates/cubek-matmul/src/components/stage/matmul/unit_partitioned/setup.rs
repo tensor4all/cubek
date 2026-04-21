@@ -10,7 +10,7 @@ use crate::components::{
             unit_partitioned::{UnitMatmul, UnitPartitionedStageConfig},
         },
     },
-    tile::TileMatmulFamily,
+    tile_matmul::TileMatmulFamily,
 };
 use crate::definition::{
     Acc, Lhs, MatmulElems, MatmulSetupError, MatmulTypes, MatmulVectorSizes, MatrixTypes, Rhs,
@@ -31,6 +31,7 @@ type SSz<T> = crate::definition::StageSize<T>;
 impl<TM: TileMatmulFamily, StageIn: StageFamily, StageAcc: StageFamily> StageMatmulFamily
     for UnitMatmulFamily<TM, StageIn, StageAcc>
 {
+    type Scope = TM::Scope;
     type LhsStage = StageIn;
     type RhsStage = StageIn;
     type AccStage = StageAcc;

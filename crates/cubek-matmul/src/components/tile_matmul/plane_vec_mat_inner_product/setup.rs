@@ -1,8 +1,9 @@
 use crate::components::resource::CubeDimResource;
+use crate::components::tile_matmul::Plane as PlaneScope;
 use crate::{
-    components::tile::SharedTileConfig, components::tile::TileMatmulFamily,
-    components::tile::plane_vec_mat_inner_product::config::PlaneVecMatInnerProductConfig,
-    components::tile::plane_vec_mat_inner_product::matmul::PlaneVecMatInnerProduct,
+    components::tile_matmul::SharedTileConfig, components::tile_matmul::TileMatmulFamily,
+    components::tile_matmul::plane_vec_mat_inner_product::config::PlaneVecMatInnerProductConfig,
+    components::tile_matmul::plane_vec_mat_inner_product::matmul::PlaneVecMatInnerProduct,
 };
 use crate::{
     definition::{MatmulAvailabilityError, MatmulElems, MatmulSetupError},
@@ -20,6 +21,7 @@ use cubek_std::InvalidConfigError;
 
 impl TileMatmulFamily for PlaneVecMatInnerProduct {
     type Config = PlaneVecMatInnerProductConfig;
+    type Scope = PlaneScope;
     type Matmul<L: Numeric, NL: Size, R: Numeric, NR: Size, A: Numeric, NA: Size> =
         PlaneVecMatInnerProduct;
 

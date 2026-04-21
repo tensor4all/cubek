@@ -1,24 +1,21 @@
 use cubecl::prelude::*;
 use cubek_std::{MatrixLayout, tile::StridedTile};
 
-use crate::components::tile::{SharedTileConfig, TileConfig};
+use crate::components::tile_matmul::tile::Scope;
+use crate::components::tile_matmul::{SharedTileConfig, TileConfig};
 use crate::definition::StageIdent;
 
-use super::{InterleavedTile, Tilex};
-
-// ===========================================================================
-// Allocate
-// ===========================================================================
+use super::{InterleavedTile, Tile};
 
 #[cube]
-pub fn interleaved_allocate_lhs<L: Numeric, VL: Size>(
+pub fn interleaved_allocate_lhs<L: Numeric, VL: Size, Sc: Scope>(
     #[comptime] layout: MatrixLayout,
     #[comptime] config: SharedTileConfig,
-) -> Tilex<L, VL, ReadWrite> {
+) -> Tile<L, VL, Sc, ReadWrite> {
     let m = config.elements_in_tile_m();
     let k = config.elements_in_tile_k();
     let plane_dim = config.plane_dim();
-    Tilex::new_Interleaved(InterleavedTile::<L> {
+    Tile::new_Interleaved(InterleavedTile::<L> {
         data: Array::new((m * (k / plane_dim)) as usize),
         matrix_layout: layout,
         config,
@@ -26,14 +23,14 @@ pub fn interleaved_allocate_lhs<L: Numeric, VL: Size>(
 }
 
 #[cube]
-pub fn interleaved_allocate_rhs<R: Numeric, VR: Size>(
+pub fn interleaved_allocate_rhs<R: Numeric, VR: Size, Sc: Scope>(
     #[comptime] layout: MatrixLayout,
     #[comptime] config: SharedTileConfig,
-) -> Tilex<R, VR, ReadWrite> {
+) -> Tile<R, VR, Sc, ReadWrite> {
     let n = config.elements_in_tile_n();
     let k = config.elements_in_tile_k();
     let plane_dim = config.plane_dim();
-    Tilex::new_Interleaved(InterleavedTile::<R> {
+    Tile::new_Interleaved(InterleavedTile::<R> {
         data: Array::new(((k / plane_dim) * n) as usize),
         matrix_layout: layout,
         config,
@@ -41,24 +38,18 @@ pub fn interleaved_allocate_rhs<R: Numeric, VR: Size>(
 }
 
 #[cube]
-pub fn interleaved_allocate_acc<A: Numeric, VA: Size>(
+pub fn interleaved_allocate_acc<A: Numeric, VA: Size, Sc: Scope>(
     #[comptime] layout: MatrixLayout,
     #[comptime] config: SharedTileConfig,
-) -> Tilex<A, VA, ReadWrite> {
+) -> Tile<A, VA, Sc, ReadWrite> {
     let m = config.elements_in_tile_m();
     let n = config.elements_in_tile_n();
-    Tilex::new_Interleaved(InterleavedTile::<A> {
+    Tile::new_Interleaved(InterleavedTile::<A> {
         data: Array::new((m * n) as usize),
         matrix_layout: layout,
         config,
     })
 }
-
-// ===========================================================================
-// Execute: (Interleaved, Interleaved, Interleaved)
-// Note: needs layouts from all three operands since lhs/rhs layouts affect
-// indexing during the multiply-accumulate.
-// ===========================================================================
 
 #[cube]
 pub fn interleaved_execute<L: Numeric, R: Numeric, A: Numeric>(
@@ -99,13 +90,15 @@ pub fn interleaved_execute<L: Numeric, R: Numeric, A: Numeric>(
     }
 }
 
-// ===========================================================================
-// Load: SharedMemory -> Interleaved
-// ===========================================================================
-
 #[cube]
-pub fn interleaved_load_from_shared<E: Numeric, ES: Size, N: Numeric, V: Size>(
-    shared: &StridedTile<E, ES, ReadOnly>,
+pub fn interleaved_load_from_shared<
+    E: Numeric,
+    ES: Size,
+    N: Numeric,
+    V: Size,
+    IO: SliceVisibility,
+>(
+    shared: &StridedTile<E, ES, IO>,
     arr: &mut Array<N>,
     #[comptime] config: SharedTileConfig,
     #[comptime] ident: StageIdent,
@@ -163,10 +156,6 @@ pub fn interleaved_load_from_shared<E: Numeric, ES: Size, N: Numeric, V: Size>(
     }
 }
 
-// ===========================================================================
-// Load: None -> Interleaved (zero fill)
-// ===========================================================================
-
 #[cube]
 pub fn interleaved_load_zeros<N: Numeric, V: Size>(
     arr: &mut Array<N>,
@@ -180,38 +169,27 @@ pub fn interleaved_load_zeros<N: Numeric, V: Size>(
     }
 }
 
-// ===========================================================================
-// Write: Interleaved -> SharedMemory
-// ===========================================================================
-
 #[cube]
 pub fn interleaved_write_to_shared<E: Numeric, ES: Size, A: Numeric, VA: Size>(
     shared: &mut StridedTile<E, ES, ReadWrite>,
-    arr: &mut Array<A>,
+    arr: &Array<A>,
     #[comptime] config: SharedTileConfig,
 ) {
-    let m = config.elements_in_tile_m() as usize;
-    let n = config.elements_in_tile_n() as usize;
+    let m = config.elements_in_tile_m();
+    let n = config.elements_in_tile_n();
+    let out_vector_size = shared.container.vector_size().comptime() as u32;
+    let size_mn = m * n;
 
-    // Consolidate: sum across plane
+    // `plane_sum` reduces across the plane, so every unit must participate. Only unit 0 stores.
     #[unroll]
-    for i in 0..m * n {
-        arr[i] = plane_sum(arr[i]);
-    }
-
-    // Store (only unit 0 writes)
-    if UNIT_POS_X == 0 {
-        let out_vector_size = shared.container.vector_size().comptime() as u32;
-        let size_mn = (m * n) as u32;
-
+    for i in 0..size_mn / out_vector_size {
+        let mut vector = Vector::<A, ES>::empty();
         #[unroll]
-        for i in 0..size_mn / out_vector_size {
+        for j in 0..out_vector_size {
+            vector[j as usize] = plane_sum(arr[(i * out_vector_size + j) as usize]);
+        }
+        if UNIT_POS_X == 0 {
             let offs = shared.stage_offset(i);
-            let mut vector = Vector::<A, ES>::empty();
-            #[unroll]
-            for j in 0..out_vector_size {
-                vector[j as usize] = arr[(i * out_vector_size + j) as usize];
-            }
             shared.container[offs as usize] = Vector::cast_from(vector);
         }
     }

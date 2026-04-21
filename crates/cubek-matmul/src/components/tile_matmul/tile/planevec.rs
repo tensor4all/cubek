@@ -1,22 +1,23 @@
 use cubecl::prelude::*;
 use cubek_std::{MatrixLayout, tile::StridedTile};
 
-use crate::components::tile::{SharedTileConfig, TileConfig};
+use crate::components::tile_matmul::tile::Scope;
+use crate::components::tile_matmul::{SharedTileConfig, TileConfig};
 use crate::definition::StageIdent;
 
-use super::{PlaneVecTile, Tilex};
+use super::{PlaneVecTile, Tile};
 
 // ===========================================================================
 // Allocate
 // ===========================================================================
 
 #[cube]
-pub fn planevec_allocate_lhs<L: Numeric, VL: Size>(
+pub fn planevec_allocate_lhs<L: Numeric, VL: Size, Sc: Scope>(
     #[comptime] layout: MatrixLayout,
     #[comptime] config: SharedTileConfig,
     #[comptime] reduce_vector_size: u32,
-) -> Tilex<L, VL, ReadWrite> {
-    Tilex::new_PlaneVec(PlaneVecTile::<L, VL> {
+) -> Tile<L, VL, Sc, ReadWrite> {
+    Tile::new_PlaneVec(PlaneVecTile::<L, VL> {
         data: Array::new(1usize),
         matrix_layout: layout,
         config,
@@ -25,12 +26,12 @@ pub fn planevec_allocate_lhs<L: Numeric, VL: Size>(
 }
 
 #[cube]
-pub fn planevec_allocate_rhs<R: Numeric, VR: Size>(
+pub fn planevec_allocate_rhs<R: Numeric, VR: Size, Sc: Scope>(
     #[comptime] layout: MatrixLayout,
     #[comptime] config: SharedTileConfig,
     #[comptime] reduce_vector_size: u32,
-) -> Tilex<R, VR, ReadWrite> {
-    Tilex::new_PlaneVec(PlaneVecTile::<R, VR> {
+) -> Tile<R, VR, Sc, ReadWrite> {
+    Tile::new_PlaneVec(PlaneVecTile::<R, VR> {
         data: Array::new(config.elements_in_tile_n() as usize),
         matrix_layout: layout,
         config,
@@ -39,12 +40,12 @@ pub fn planevec_allocate_rhs<R: Numeric, VR: Size>(
 }
 
 #[cube]
-pub fn planevec_allocate_acc<A: Numeric, VA: Size>(
+pub fn planevec_allocate_acc<A: Numeric, VA: Size, Sc: Scope>(
     #[comptime] layout: MatrixLayout,
     #[comptime] config: SharedTileConfig,
     #[comptime] reduce_vector_size: u32,
-) -> Tilex<A, VA, ReadWrite> {
-    Tilex::new_PlaneVec(PlaneVecTile::<A, VA> {
+) -> Tile<A, VA, Sc, ReadWrite> {
+    Tile::new_PlaneVec(PlaneVecTile::<A, VA> {
         data: Array::new(config.elements_in_tile_n() as usize),
         matrix_layout: layout,
         config,
@@ -82,8 +83,8 @@ pub fn planevec_execute<L: Numeric, VL: Size, R: Numeric, VR: Size, A: Numeric, 
 // ===========================================================================
 
 #[cube]
-pub fn planevec_load_from_shared<E: Numeric, ES: Size, N: Numeric, V: Size>(
-    shared: &StridedTile<E, ES, ReadOnly>,
+pub fn planevec_load_from_shared<E: Numeric, ES: Size, N: Numeric, V: Size, IO: SliceVisibility>(
+    shared: &StridedTile<E, ES, IO>,
     arr: &mut Array<Vector<N, V>>,
     #[comptime] config: SharedTileConfig,
     #[comptime] ident: StageIdent,
@@ -129,7 +130,7 @@ pub fn planevec_load_zeros<N: Numeric, V: Size>(
 #[cube]
 pub fn planevec_write_to_shared<E: Numeric, ES: Size, A: Numeric, VA: Size>(
     shared: &mut StridedTile<E, ES, ReadWrite>,
-    arr: &mut Array<Vector<A, VA>>,
+    arr: &Array<Vector<A, VA>>,
     #[comptime] config: SharedTileConfig,
     #[comptime] reduce_vector_size: u32,
 ) {

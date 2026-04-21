@@ -1,13 +1,14 @@
-use crate::components::resource::CubeDimResource;
 use crate::{
-    components::tile::SharedTileConfig, components::tile::TileMatmulFamily,
-    components::tile::register::config::RegisterMatmulConfig,
-    components::tile::register::matmul::RegisterMatmul,
-};
-use crate::{
-    definition::TilingBlueprint,
-    definition::{MatmulAvailabilityError, MatmulElems},
-    definition::{MatmulSetupError, MatmulVectorSizes},
+    components::{
+        resource::CubeDimResource,
+        tile_matmul::{
+            Plane, SharedTileConfig, TileMatmulFamily,
+            interleaved::{InterleavedMatmul, config::InterleavedMatmulConfig},
+        },
+    },
+    definition::{
+        MatmulAvailabilityError, MatmulElems, MatmulSetupError, MatmulVectorSizes, TilingBlueprint,
+    },
 };
 use cubecl::{
     ir::{ElemType, FloatKind},
@@ -16,9 +17,11 @@ use cubecl::{
 };
 use cubek_std::{InvalidConfigError, MatrixLayout};
 
-impl TileMatmulFamily for RegisterMatmul {
-    type Config = RegisterMatmulConfig;
-    type Matmul<L: Numeric, NL: Size, R: Numeric, NR: Size, A: Numeric, NA: Size> = RegisterMatmul;
+impl TileMatmulFamily for InterleavedMatmul {
+    type Config = InterleavedMatmulConfig;
+    type Scope = Plane;
+    type Matmul<L: Numeric, VL: Size, R: Numeric, VR: Size, A: Numeric, VA: Size> =
+        InterleavedMatmul;
 
     fn requires_accelerator() -> bool {
         false
@@ -29,7 +32,7 @@ impl TileMatmulFamily for RegisterMatmul {
     }
 
     fn cubedim_resource() -> Result<CubeDimResource, InvalidConfigError> {
-        Ok(CubeDimResource::Units(1))
+        Ok(CubeDimResource::Planes(1))
     }
 
     fn expand_config(
@@ -38,9 +41,7 @@ impl TileMatmulFamily for RegisterMatmul {
         _dtypes: &MatmulElems,
         _vector_sizes: &MatmulVectorSizes,
     ) -> Result<Self::Config, MatmulSetupError> {
-        Ok(RegisterMatmulConfig::from_shared_tile_config(
-            blueprint.lhs_layout,
-            blueprint.rhs_layout,
+        Ok(InterleavedMatmulConfig::from_shared_tile_config(
             SharedTileConfig::new(
                 blueprint.tiling_scheme.tile_size,
                 blueprint.plane_dim,
@@ -68,22 +69,32 @@ impl TileMatmulFamily for RegisterMatmul {
         let n = blueprint.tiling_scheme.tile_size.n();
         let k = blueprint.tiling_scheme.tile_size.k();
 
+        let plane_dim = blueprint.plane_dim;
+        if !k.is_multiple_of(plane_dim) {
+            return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
+                "k must be divisible by plane_dim. Got k={:?}, plane_dim={:?}",
+                k, plane_dim,
+            ))));
+        }
+
+        let k_local = k / plane_dim;
+
         let lhs = vector_sizes.lhs as u32;
         let rhs = vector_sizes.rhs as u32;
         let out = vector_sizes.out as u32;
 
         match blueprint.lhs_layout {
             MatrixLayout::RowMajor => {
-                if !k.is_multiple_of(lhs) {
+                if !k_local.is_multiple_of(lhs) {
                     return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-                        "Tile shape in vectorized axis k({k:?}) should be divisible by vector size lhs({lhs:?})"
+                        "Local shape in vectorized axis k ({k_local:?}) should be divisible by vector size lhs ({lhs:?})"
                     ))));
                 }
             }
             MatrixLayout::ColMajor => {
                 if !m.is_multiple_of(lhs) {
                     return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-                        "Tile shape in vectorized axis m({m:?}) should be divisible by vector size lhs({lhs:?})"
+                        "Tile shape in vectorized axis m ({m:?}) should be divisible by vector size lhs ({lhs:?})"
                     ))));
                 }
             }
@@ -92,14 +103,14 @@ impl TileMatmulFamily for RegisterMatmul {
             MatrixLayout::RowMajor => {
                 if !n.is_multiple_of(rhs) {
                     return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-                        "Tile shape in vectorized axis n({n:?}) should be divisible by vector size rhs({rhs:?})"
+                        "Tile shape in vectorized axis n ({n:?}) should be divisible by vector size rhs ({rhs:?})"
                     ))));
                 }
             }
             MatrixLayout::ColMajor => {
-                if !k.is_multiple_of(rhs) {
+                if !k_local.is_multiple_of(rhs) {
                     return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-                        "Tile shape in vectorized axis k({k:?}) should be divisible by vector size rhs({rhs:?})"
+                        "Local shape in vectorized axis k ({k_local:?}) should be divisible by vector size rhs ({rhs:?})"
                     ))));
                 }
             }
@@ -107,7 +118,7 @@ impl TileMatmulFamily for RegisterMatmul {
 
         if !n.is_multiple_of(out) {
             return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-                "Tile shape in vectorized axis n({n:?}) should be divisible by vector size out({out:?})"
+                "Tile shape in vectorized axis n ({n:?}) should be divisible by vector size out ({out:?})"
             ))));
         }
 

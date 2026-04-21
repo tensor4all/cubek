@@ -1,29 +1,29 @@
 use cubecl;
 use cubecl::prelude::*;
-use cubek_matmul::components::tile::Tilex;
+use cubek_matmul::components::tile_matmul::{Plane, Tile};
 use cubek_std::TileSize;
 
 #[cube]
 pub trait InnerMatmul<L: Numeric, VL: Size, R: Numeric, VR: Size, A: Numeric, VA: Size> {
     type Config: Copy + Clone;
 
-    fn allocate_lhs(#[comptime] config: Self::Config) -> Tilex<L, VL, ReadWrite>;
+    fn allocate_lhs(#[comptime] config: Self::Config) -> Tile<L, VL, Plane, ReadWrite>;
     fn load_lhs<E: Numeric, ES: Size>(
-        source: &Tilex<E, ES, ReadOnly>,
-        dest: &mut Tilex<L, VL, ReadWrite>,
+        source: &Tile<E, ES, Plane, ReadOnly>,
+        dest: &mut Tile<L, VL, Plane, ReadWrite>,
     );
 
-    fn allocate_rhs(#[comptime] config: Self::Config) -> Tilex<R, VR, ReadWrite>;
-    fn allocate_rhs_transposed(#[comptime] config: Self::Config) -> Tilex<R, VR, ReadWrite>;
+    fn allocate_rhs(#[comptime] config: Self::Config) -> Tile<R, VR, Plane, ReadWrite>;
+    fn allocate_rhs_transposed(#[comptime] config: Self::Config) -> Tile<R, VR, Plane, ReadWrite>;
     fn load_rhs<E: Float, ES: Size>(
-        source: &Tilex<E, ES, ReadOnly>,
-        dest: &mut Tilex<R, VR, ReadWrite>,
+        source: &Tile<E, ES, Plane, ReadOnly>,
+        dest: &mut Tile<R, VR, Plane, ReadWrite>,
     );
 
     fn execute(
-        lhs: &Tilex<L, VL, ReadWrite>,
-        rhs: &Tilex<R, VR, ReadWrite>,
-        acc: &mut Tilex<A, VA, ReadWrite>,
+        lhs: &Tile<L, VL, Plane, ReadWrite>,
+        rhs: &Tile<R, VR, Plane, ReadWrite>,
+        acc: &mut Tile<A, VA, Plane, ReadWrite>,
         #[comptime] tile_size: TileSize,
     );
 }

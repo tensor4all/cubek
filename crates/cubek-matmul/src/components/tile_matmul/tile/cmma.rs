@@ -4,20 +4,19 @@ use cubek_std::{
     tile::{Strided, StridedTile},
 };
 
-use crate::components::tile::cmma::{CmmaFragmentReader as _, CmmaStageReader, CmmaStageWriter};
+use crate::components::tile_matmul::cmma::{
+    CmmaFragmentReader as _, CmmaStageReader, CmmaStageWriter,
+};
+use crate::components::tile_matmul::tile::Scope;
 use crate::definition::StageIdent;
 
-use super::{CmmaTile, Tilex};
-
-// ===========================================================================
-// Allocate
-// ===========================================================================
+use super::{CmmaTile, Tile};
 
 #[cube]
-pub fn cmma_allocate_lhs<L: Numeric, VL: Size>(
+pub fn cmma_allocate_lhs<L: Numeric, VL: Size, Sc: Scope>(
     #[comptime] layout: MatrixLayout,
     #[comptime] tile_size: TileSize,
-) -> Tilex<L, VL, ReadWrite> {
+) -> Tile<L, VL, Sc, ReadWrite> {
     let fragment = unsafe {
         cmma::Matrix::<L>::uninitialized(
             cmma::MatrixIdent::A,
@@ -27,17 +26,17 @@ pub fn cmma_allocate_lhs<L: Numeric, VL: Size>(
             as_cmma_layout(layout),
         )
     };
-    Tilex::new_Cmma(CmmaTile::<L> {
+    Tile::new_Cmma(CmmaTile::<L> {
         matrix: fragment,
         matrix_layout: layout,
     })
 }
 
 #[cube]
-pub fn cmma_allocate_rhs<R: Numeric, VR: Size>(
+pub fn cmma_allocate_rhs<R: Numeric, VR: Size, Sc: Scope>(
     #[comptime] layout: MatrixLayout,
     #[comptime] tile_size: TileSize,
-) -> Tilex<R, VR, ReadWrite> {
+) -> Tile<R, VR, Sc, ReadWrite> {
     let fragment = unsafe {
         cmma::Matrix::<R>::uninitialized(
             cmma::MatrixIdent::B,
@@ -47,17 +46,17 @@ pub fn cmma_allocate_rhs<R: Numeric, VR: Size>(
             as_cmma_layout(layout),
         )
     };
-    Tilex::new_Cmma(CmmaTile::<R> {
+    Tile::new_Cmma(CmmaTile::<R> {
         matrix: fragment,
         matrix_layout: layout,
     })
 }
 
 #[cube]
-pub fn cmma_allocate_acc<A: Numeric, VA: Size>(
+pub fn cmma_allocate_acc<A: Numeric, VA: Size, Sc: Scope>(
     #[comptime] layout: MatrixLayout,
     #[comptime] tile_size: TileSize,
-) -> Tilex<A, VA, ReadWrite> {
+) -> Tile<A, VA, Sc, ReadWrite> {
     let fragment = unsafe {
         cmma::Matrix::<A>::uninitialized(
             cmma::MatrixIdent::Accumulator,
@@ -67,15 +66,11 @@ pub fn cmma_allocate_acc<A: Numeric, VA: Size>(
             cmma::MatrixLayout::Undefined,
         )
     };
-    Tilex::new_Cmma(CmmaTile::<A> {
+    Tile::new_Cmma(CmmaTile::<A> {
         matrix: fragment,
         matrix_layout: layout,
     })
 }
-
-// ===========================================================================
-// Execute: (Cmma, Cmma, Cmma)
-// ===========================================================================
 
 #[cube]
 pub fn cmma_execute<L: Numeric, R: Numeric, A: Numeric>(
@@ -86,24 +81,21 @@ pub fn cmma_execute<L: Numeric, R: Numeric, A: Numeric>(
     cmma::execute::<L, R, A, A>(lhs, rhs, acc, acc);
 }
 
-// ===========================================================================
-// Load: SharedMemory -> Cmma
-// ===========================================================================
-
 #[cube]
-pub fn cmma_load_from_shared<E: Numeric, ES: Size, N: Numeric, V: Size>(
-    shared: &StridedTile<E, ES, ReadOnly>,
+pub fn cmma_load_from_shared<E: Numeric, ES: Size, N: Numeric, V: Size, IO: SliceVisibility>(
+    shared: &StridedTile<E, ES, IO>,
     matrix: &mut cmma::Matrix<N>,
     #[comptime] ident: StageIdent,
     #[comptime] matrix_layout: MatrixLayout,
 ) {
+    let shared = shared.to_read_only();
     match ident {
         StageIdent::Lhs | StageIdent::Rhs => {
-            CmmaStageReader::<Strided>::load_fragment(shared, matrix, ComptimeOption::new_None());
+            CmmaStageReader::<Strided>::load_fragment(&shared, matrix, ComptimeOption::new_None());
         }
         StageIdent::Acc => {
             CmmaStageReader::<Strided>::load_fragment(
-                shared,
+                &shared,
                 matrix,
                 ComptimeOption::new_Some(as_cmma_layout(matrix_layout)),
             );
@@ -112,18 +104,10 @@ pub fn cmma_load_from_shared<E: Numeric, ES: Size, N: Numeric, V: Size>(
     }
 }
 
-// ===========================================================================
-// Load: None -> Cmma (zero fill)
-// ===========================================================================
-
 #[cube]
 pub fn cmma_load_zeros<N: Numeric, V: Size>(matrix: &mut cmma::Matrix<N>) {
     cmma::fill(matrix, N::from_int(0));
 }
-
-// ===========================================================================
-// Write: Cmma -> SharedMemory
-// ===========================================================================
 
 #[cube]
 pub fn cmma_write_to_shared<E: Numeric, ES: Size, A: Numeric, VA: Size>(
