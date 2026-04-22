@@ -42,7 +42,16 @@ pub(crate) fn launch_reduce<Run: Runtime>(
 
     let problem = ReduceProblem {
         vector_size: input.shape[reduce_axis],
-        vector_count: output.shape.iter().copied().product(),
+        // Count reductions, not output scalars: TopK/ArgTopK produce k outputs per
+        // reduction, so the output shape's reduce-axis slot is k (not 1). Using the
+        // full product would over-count reductions by a factor of k and launch too
+        // many units.
+        vector_count: output
+            .shape
+            .iter()
+            .enumerate()
+            .filter_map(|(d, s)| (d != reduce_axis).then_some(s))
+            .product(),
         axis: reduce_axis,
         dtypes,
         address_type,
