@@ -6,7 +6,7 @@ use cubecl::{
     zspace::{Shape, Strides},
 };
 
-use crate::test_tensor::cast::copy_casted;
+use crate::test_tensor::{cast::copy_casted, strides::physical_extent};
 
 #[derive(Debug, Clone)]
 pub struct HostData {
@@ -55,11 +55,21 @@ impl HostDataVec {
 impl HostData {
     pub fn from_tensor_handle(
         client: &ComputeClient<TestRuntime>,
-        tensor_handle: TensorHandle<TestRuntime>,
+        mut tensor_handle: TensorHandle<TestRuntime>,
         host_data_type: HostDataType,
     ) -> Self {
         let shape = tensor_handle.shape().clone();
         let strides = tensor_handle.strides().clone();
+
+        // Reshape to a flat 1D view of the full physical buffer so the read
+        // covers every offset the jumpy strides might reach. Without this, a
+        // shape like [256,256] with strides [512,1] would only read the
+        // shape.product() (65536) elements that `copy_casted`'s contiguous
+        // rewrite walks, and HostData.get_f32 would then index out-of-bounds
+        // when the logical walk crosses the padding.
+        let physical_len = physical_extent(&shape, &strides);
+        tensor_handle.metadata.shape = Shape::from(vec![physical_len]);
+        tensor_handle.metadata.strides = Strides::new(&[1]);
 
         let data = match host_data_type {
             HostDataType::F32 => {
