@@ -6,7 +6,10 @@ pub enum VectorizationMode {
     Perpendicular,
 }
 
-pub(crate) fn output_vectorization_axis(input_strides: &Strides) -> usize {
+pub(crate) fn output_vectorization_axis(
+    input_strides: &Strides,
+    vectorization_mode: VectorizationMode,
+) -> usize {
     if input_strides.len() < 2 {
         // The axis of vectorization for input and output are both 0
         return 0;
@@ -24,7 +27,14 @@ pub(crate) fn output_vectorization_axis(input_strides: &Strides) -> usize {
         }
     }
 
-    min2.1
+    match vectorization_mode {
+        // Parallel: reduce axis is the contiguous (smallest-stride) axis.
+        // The output's vectorization axis is the next-smallest-stride non-reduce axis.
+        VectorizationMode::Parallel => min2.1,
+        // Perpendicular: reduce axis is a non-contiguous axis. The contiguous
+        // (smallest-stride) axis is the SIMD vectorization axis in the output.
+        VectorizationMode::Perpendicular => min1.1,
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

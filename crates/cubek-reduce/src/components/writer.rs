@@ -137,6 +137,7 @@ impl<Out: NumericVector> ParallelWriter<Out> {
 
         match out {
             Value::Multiple(array) => {
+                #[unroll]
                 for i in 0..self.accumulator_length {
                     let mut vec = self.buffer.multiple_mut()[i];
                     vec[local_index] = array[i];
@@ -155,9 +156,12 @@ impl<Out: NumericVector> ParallelWriter<Out> {
     pub fn commit(&mut self) {
         match &mut self.buffer {
             Value::Multiple(array) => {
+                let write_index = self.write_index as u32;
+                #[unroll]
                 for k_iter in 0..self.accumulator_length {
+                    let k_u32 = comptime!(k_iter as u32);
                     self.output
-                        .write((self.write_index as u32, k_iter as u32), array[k_iter])
+                        .write((write_index, k_u32.runtime()), array[k_iter])
                 }
             }
             Value::Single(vector) => self
@@ -189,6 +193,7 @@ pub struct PerpendicularWriter<Out: NumericVector> {
     #[cube(comptime)]
     output_vector_size: VectorSize,
     write_index: usize,
+    #[cube(comptime)]
     accumulator_length: usize,
 }
 
@@ -275,6 +280,7 @@ impl<Out: NumericVector> PerpendicularWriter<Out> {
     }
 
     fn write_multiple<S: Size>(&self, array: Array<Vector<Out::T, S>>) {
+        #[unroll]
         for i in 0..self.accumulator_length {
             self.write_single(array[i], i);
         }

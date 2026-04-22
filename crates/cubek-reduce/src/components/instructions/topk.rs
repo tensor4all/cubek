@@ -77,6 +77,7 @@ impl<P: ReducePrecision> ReduceInstruction<P> for TopK {
 
     fn null_accumulator(this: &Self) -> Accumulator<P> {
         let mut elements = Array::new(comptime!(this.k));
+        #[unroll]
         for i in 0..this.k {
             elements[i] = Vector::new(P::EA::min_value());
         }
@@ -101,7 +102,7 @@ impl<P: ReducePrecision> ReduceInstruction<P> for TopK {
                 // Every thread starts with its own item as the candidate
                 let mut local_best_val = Vector::cast_from(item.elements);
                 let unit_pos_plane = Vector::new(UNIT_POS_X);
-
+                #[unroll]
                 for _i in 0..this.k {
                     // 1. Find the global maximum among currently unmasked items
                     let winning_val = plane_max(local_best_val);
@@ -216,11 +217,18 @@ impl<P: ReducePrecision> ReduceInstruction<P> for TopK {
         let vector_size = accumulators[0].size().comptime();
 
         let mut topk = Array::new(this.k);
+        #[unroll]
+        for slot in 0..this.k {
+            topk[slot] = Out::min_value();
+        }
 
+        #[unroll]
         for i in 0..this.k {
+            #[unroll]
             for j in 0..vector_size {
                 let mut element = Out::cast_from(accumulators[i][j]);
 
+                #[unroll]
                 for slot in 0..this.k {
                     let current = topk[slot];
 
@@ -240,11 +248,10 @@ impl<P: ReducePrecision> ReduceInstruction<P> for TopK {
         accumulator: Accumulator<P>,
         _shape_axis_reduce: usize,
     ) -> Value<Vector<Out, P::SI>> {
-        // TODO if Out==P::EA, return acc_values directly
-
         let acc_values = accumulator.elements.multiple();
         let mut output = Array::new(this.k);
 
+        #[unroll]
         for i in 0..this.k {
             output[i] = Vector::cast_from(acc_values[i]);
         }

@@ -78,6 +78,7 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ArgTopK {
     fn null_accumulator(this: &Self) -> Accumulator<P> {
         let mut elements = Array::new(comptime!(this.k));
         let mut args = Array::new(comptime!(this.k));
+        #[unroll]
         for i in 0..this.k {
             elements[i] = Vector::new(P::EA::min_value());
             args[i] = Vector::new(u32::MAX);
@@ -110,6 +111,7 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ArgTopK {
         let mut item = Vector::cast_from(candidate_item);
         let mut coordinate = candidate_coordinate;
 
+        #[unroll]
         for k_iter in 0..this.k {
             let current_item = elements[k_iter];
             let current_coord = args[k_iter];
@@ -184,12 +186,20 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ArgTopK {
 
         let mut topk = Array::new(this.k);
         let mut topk_args = Array::new(this.k);
+        #[unroll]
+        for slot in 0..this.k {
+            topk[slot] = P::EA::min_value();
+            topk_args[slot] = Out::cast_from(u32::MAX);
+        }
 
+        #[unroll]
         for i in 0..this.k {
+            #[unroll]
             for j in 0..vector_size {
                 let mut element = accumulators[i][j];
                 let mut coord = Out::cast_from(args[i][j]);
 
+                #[unroll]
                 for slot in 0..this.k {
                     let current = topk[slot];
                     let current_coord = topk_args[slot];
@@ -216,6 +226,7 @@ impl<P: ReducePrecision> ReduceInstruction<P> for ArgTopK {
         let acc_args = accumulator.args.multiple();
         let mut output = Array::new(this.k);
 
+        #[unroll]
         for i in 0..this.k {
             output[i] = Vector::cast_from(acc_args[i]);
         }
