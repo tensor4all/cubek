@@ -100,9 +100,9 @@ impl<P: ReducePrecision> ReduceInstruction<P> for TopK {
             ReduceStep::Plane => {
                 // Every thread starts with its own item as the candidate
                 let mut local_best_val = Vector::cast_from(item.elements);
-                let unit_pos_plane = Vector::new(UNIT_POS_PLANE);
+                let unit_pos_plane = Vector::new(UNIT_POS_X);
 
-                for i in 0..this.k {
+                for _i in 0..this.k {
                     // 1. Find the global maximum among currently unmasked items
                     let winning_val = plane_max(local_best_val);
 
@@ -147,36 +147,6 @@ impl<P: ReducePrecision> ReduceInstruction<P> for TopK {
         }
     }
 
-    //fn reduce(
-    //    this: &Self,
-    //    accumulator: &mut Accumulator<P>,
-    //    item: Item<P>,
-    //    #[comptime] reduce_step: ReduceStep,
-    //) {
-    //    let item = item.elements;
-    //
-    //    let candidate_item = match reduce_step {
-    //        ReduceStep::Plane => {
-    //            todo!()
-    //        }
-    //        ReduceStep::Identity => item,
-    //    };
-    //
-    //    let elements = accumulator.elements.multiple_mut();
-    //    let mut item = Vector::cast_from(candidate_item);
-    //
-    //    for k_iter in 0..this.k {
-    //        let current_item = elements[k_iter];
-    //
-    //        let keep = current_item.greater_than(item);
-    //        let new_top_item = select_many(keep, current_item, item);
-    //        let new_rest_item = select_many(keep, item, current_item);
-    //
-    //        elements[k_iter] = new_top_item;
-    //        item = new_rest_item;
-    //    }
-    //}
-    //
     fn plane_reduce_inplace(this: &Self, accumulator: &mut Accumulator<P>) {
         //todo!();
         let elements = accumulator.elements.multiple_mut();
@@ -187,7 +157,7 @@ impl<P: ReducePrecision> ReduceInstruction<P> for TopK {
         // 'local_ptr' tracks which of the K items in our local list we are proposing.
         let mut local_ptr = Vector::new(0u32);
         // 'lane_id' gives every thread a unique ID for tie-breaking.
-        let lane_id = Vector::new(UNIT_POS_PLANE);
+        let lane_id = Vector::new(UNIT_POS_X);
 
         for i in 0..this.k {
             // 1. Fetch the current local candidate
