@@ -40,6 +40,26 @@ impl GlobalFullUnitReduce {
         let write_count = writer.write_count();
         let reduce_index_start = write_index * write_count;
 
+        // For TopK/ArgTopK (accumulator_length > 1), each unit produces all `k`
+        // slots for one row. With `vector_count` sized to the full output
+        // (shape.product), multiple units map to the same row in output-stride
+        // order (differing only in the reduce-axis slot). Let the slot==0 units
+        // own the row; terminate the rest so they don't race and overwrite.
+        //
+        // The scalar index mirrors what the reader uses to decompose the output
+        // coordinate: parallel uses `reduce_index_start` directly, perpendicular
+        // scales by input vector size.
+        let acc_format = I::accumulator_format(inst);
+        if comptime![acc_format.len() > 1] {
+            let scalar_index = match vectorization_mode {
+                VectorizationMode::Parallel => reduce_index_start,
+                VectorizationMode::Perpendicular => reduce_index_start * input.vector_size(),
+            };
+            if output.coordinate(scalar_index, reduce_axis) > 0 {
+                terminate!();
+            }
+        }
+
         let idle = idle_check::<P, Out>(
             input,
             output,

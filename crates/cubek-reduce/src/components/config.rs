@@ -8,14 +8,16 @@ pub enum VectorizationMode {
 
 pub(crate) fn output_vectorization_axis(
     input_strides: &Strides,
-    vectorization_mode: VectorizationMode,
+    reduce_axis: usize,
+    _vectorization_mode: VectorizationMode,
 ) -> usize {
     if input_strides.len() < 2 {
         // The axis of vectorization for input and output are both 0
         return 0;
     }
 
-    let mut min1 = (usize::MAX, 0); // (value, index)
+    // Find the two smallest strides overall (tracking axis indices).
+    let mut min1 = (usize::MAX, 0); // (stride, axis)
     let mut min2 = (usize::MAX, 0);
 
     for (i, &s) in input_strides.iter().enumerate() {
@@ -27,13 +29,15 @@ pub(crate) fn output_vectorization_axis(
         }
     }
 
-    match vectorization_mode {
-        // Parallel: reduce axis is the contiguous (smallest-stride) axis.
-        // The output's vectorization axis is the next-smallest-stride non-reduce axis.
-        VectorizationMode::Parallel => min2.1,
-        // Perpendicular: reduce axis is a non-contiguous axis. The contiguous
-        // (smallest-stride) axis is the SIMD vectorization axis in the output.
-        VectorizationMode::Perpendicular => min1.1,
+    // The vectorization axis is the smallest-stride *non-reduce* axis. For
+    // parallel reductions the reduce axis is itself the contiguous (stride 1)
+    // axis, so this falls through to the next-smallest; for perpendicular it's
+    // usually the smallest, except when the reduce axis happens to share the
+    // overall minimum (e.g. a broadcast stride of 0), which forces the fallback.
+    if min1.1 == reduce_axis {
+        min2.1
+    } else {
+        min1.1
     }
 }
 
