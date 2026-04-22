@@ -32,16 +32,16 @@ pub struct TopkAccumulator<E: Scalar, S: Size> {
 
 #[derive(CubeType)]
 /// Only to respect the type system. Shared Accumulator behaviour is not supported
-pub struct DummyTopkSharedAccumulator<A: CubeType + Send + Sync + 'static> {
+pub struct TopkSharedAccumulator<A: CubeType + Send + Sync + 'static> {
     #[cube(comptime)]
     _phantom: PhantomData<A>,
 }
 
 #[cube]
-impl<A: CubeType + Send + Sync + 'static, P: ReducePrecision, I: ReduceInstruction<P>>
-    SharedAccumulator<P, I> for DummyTopkSharedAccumulator<A>
+impl<A: CubeType + Send + Sync + 'static, P: ReducePrecision>
+    SharedAccumulator<P, TopK> for TopkSharedAccumulator<A>
 {
-    fn allocate(#[comptime] _length: usize, #[comptime] _coordinate: bool, _inst: &I) -> Self {
+    fn allocate(#[comptime] _length: usize, #[comptime] _coordinate: bool, _inst: &TopK) -> Self {
         unreachable!()
     }
 
@@ -56,7 +56,7 @@ impl<A: CubeType + Send + Sync + 'static, P: ReducePrecision, I: ReduceInstructi
 
 #[cube]
 impl<P: ReducePrecision> ReduceInstruction<P> for TopK {
-    type SharedAccumulator = DummyTopkSharedAccumulator<Accumulator<P>>;
+    type SharedAccumulator = TopkSharedAccumulator<Accumulator<P>>;
     type Config = usize;
 
     fn requirements(_this: &Self) -> super::ReduceRequirements {
