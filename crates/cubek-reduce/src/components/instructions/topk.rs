@@ -93,58 +93,58 @@ impl<P: ReducePrecision> ReduceInstruction<P> for TopK {
         item: Item<P>,
         #[comptime] reduce_step: ReduceStep,
     ) {
-        todo!();
-        //let elements = accumulator.elements.multiple_mut();
-        //
-        //match reduce_step {
-        //    ReduceStep::Plane => {
-        //        // Every thread starts with its own item as the candidate
-        //        let mut local_best_val = Vector::cast_from(item.elements);
-        //        let unit_pos_plane = Vector::new(UNIT_POS_PLANE);
-        //
-        //        for i in 0..this.k {
-        //            // 1. Find the global maximum among currently unmasked items
-        //            let winning_val = plane_max(local_best_val);
-        //
-        //            // 2. Tie-break: Determine which specific lane owns this value
-        //            let is_match = local_best_val.equal(winning_val);
-        //            let my_claim = select_many(is_match, unit_pos_plane, Vector::new(u32::MAX));
-        //            let winning_lane = plane_min(my_claim);
-        //
-        //            // 3. Insert the global winner into the local Top-K set
-        //            // (All threads in the warp insert the same value to stay in sync)
-        //            let mut insert_item = winning_val;
-        //            for j in 0..this.k {
-        //                let acc_item = elements[j];
-        //                let keep = acc_item.greater_than(insert_item);
-        //
-        //                elements[j] = select_many(keep, acc_item, insert_item);
-        //                insert_item = select_many(keep, insert_item, acc_item);
-        //            }
-        //
-        //            // 4. Mask out the winner: the thread that just "gave" its value
-        //            // sets its candidate to MIN so it's ignored in the next k_winners loop.
-        //            let is_winner_thread = unit_pos_plane.equal(winning_lane);
-        //            local_best_val = select_many(
-        //                is_winner_thread,
-        //                Vector::new(P::EA::min_value()),
-        //                local_best_val,
-        //            );
-        //        }
-        //    }
-        //    ReduceStep::Identity => {
-        //        // Each thread just inserts its single item into its own Top-K list
-        //        let mut insert_item = Vector::cast_from(item.elements);
-        //
-        //        for j in 0..this.k {
-        //            let acc_item = elements[j];
-        //            let keep = acc_item.greater_than(insert_item);
-        //
-        //            elements[j] = select_many(keep, acc_item, insert_item);
-        //            insert_item = select_many(keep, insert_item, acc_item);
-        //        }
-        //    }
-        //}
+        //todo!();
+        let elements = accumulator.elements.multiple_mut();
+
+        match reduce_step {
+            ReduceStep::Plane => {
+                // Every thread starts with its own item as the candidate
+                let mut local_best_val = Vector::cast_from(item.elements);
+                let unit_pos_plane = Vector::new(UNIT_POS_PLANE);
+
+                for i in 0..this.k {
+                    // 1. Find the global maximum among currently unmasked items
+                    let winning_val = plane_max(local_best_val);
+
+                    // 2. Tie-break: Determine which specific lane owns this value
+                    let is_match = local_best_val.equal(winning_val);
+                    let my_claim = select_many(is_match, unit_pos_plane, Vector::new(u32::MAX));
+                    let winning_lane = plane_min(my_claim);
+
+                    // 3. Insert the global winner into the local Top-K set
+                    // (All threads in the warp insert the same value to stay in sync)
+                    let mut insert_item = winning_val;
+                    for j in 0..this.k {
+                        let acc_item = elements[j];
+                        let keep = acc_item.greater_than(insert_item);
+
+                        elements[j] = select_many(keep, acc_item, insert_item);
+                        insert_item = select_many(keep, insert_item, acc_item);
+                    }
+
+                    // 4. Mask out the winner: the thread that just "gave" its value
+                    // sets its candidate to MIN so it's ignored in the next k_winners loop.
+                    let is_winner_thread = unit_pos_plane.equal(winning_lane);
+                    local_best_val = select_many(
+                        is_winner_thread,
+                        Vector::new(P::EA::min_value()),
+                        local_best_val,
+                    );
+                }
+            }
+            ReduceStep::Identity => {
+                // Each thread just inserts its single item into its own Top-K list
+                let mut insert_item = Vector::cast_from(item.elements);
+
+                for j in 0..this.k {
+                    let acc_item = elements[j];
+                    let keep = acc_item.greater_than(insert_item);
+
+                    elements[j] = select_many(keep, acc_item, insert_item);
+                    insert_item = select_many(keep, insert_item, acc_item);
+                }
+            }
+        }
     }
 
     //fn reduce(
@@ -178,44 +178,44 @@ impl<P: ReducePrecision> ReduceInstruction<P> for TopK {
     //}
     //
     fn plane_reduce_inplace(this: &Self, accumulator: &mut Accumulator<P>) {
-        todo!();
-        //let elements = accumulator.elements.multiple_mut();
-        //
-        //// We only need to store the final elements
-        //let mut final_elements = Array::new(this.k);
-        //
-        //// 'local_ptr' tracks which of the K items in our local list we are proposing.
-        //let mut local_ptr = Vector::new(0u32);
-        //// 'lane_id' gives every thread a unique ID for tie-breaking.
-        //let lane_id = Vector::new(UNIT_POS_PLANE);
-        //
-        //for i in 0..this.k {
-        //    // 1. Fetch the current local candidate
-        //    let mut local_best_val = Vector::new(P::EA::min_value());
-        //    for j in 0..this.k {
-        //        let is_pointed_slot = local_ptr.equal(Vector::new(j as u32));
-        //        local_best_val = select_many(is_pointed_slot, elements[j], local_best_val);
-        //    }
-        //
-        //    // 2. Find the global max value
-        //    let winning_val = plane_max(local_best_val);
-        //
-        //    // 3. TIE-BREAKER: Find WHICH thread provided the winner.
-        //    let is_candidate = local_best_val.equal(winning_val);
-        //    let candidate_id = select_many(is_candidate, lane_id, Vector::new(u32::MAX));
-        //    let winning_lane_id = plane_min(candidate_id);
-        //
-        //    // 4. Record the winner
-        //    final_elements[i] = winning_val;
-        //
-        //    // 5. Update pointer: Only the specific thread (and lane) that won increments.
-        //    let is_winner_thread = lane_id.equal(winning_lane_id);
-        //    local_ptr = select_many(is_winner_thread, local_ptr + Vector::new(1u32), local_ptr);
-        //}
-        //
-        //for i in 0..this.k {
-        //    elements[i] = final_elements[i];
-        //}
+        //todo!();
+        let elements = accumulator.elements.multiple_mut();
+
+        // We only need to store the final elements
+        let mut final_elements = Array::new(this.k);
+
+        // 'local_ptr' tracks which of the K items in our local list we are proposing.
+        let mut local_ptr = Vector::new(0u32);
+        // 'lane_id' gives every thread a unique ID for tie-breaking.
+        let lane_id = Vector::new(UNIT_POS_PLANE);
+
+        for i in 0..this.k {
+            // 1. Fetch the current local candidate
+            let mut local_best_val = Vector::new(P::EA::min_value());
+            for j in 0..this.k {
+                let is_pointed_slot = local_ptr.equal(Vector::new(j as u32));
+                local_best_val = select_many(is_pointed_slot, elements[j], local_best_val);
+            }
+
+            // 2. Find the global max value
+            let winning_val = plane_max(local_best_val);
+
+            // 3. TIE-BREAKER: Find WHICH thread provided the winner.
+            let is_candidate = local_best_val.equal(winning_val);
+            let candidate_id = select_many(is_candidate, lane_id, Vector::new(u32::MAX));
+            let winning_lane_id = plane_min(candidate_id);
+
+            // 4. Record the winner
+            final_elements[i] = winning_val;
+
+            // 5. Update pointer: Only the specific thread (and lane) that won increments.
+            let is_winner_thread = lane_id.equal(winning_lane_id);
+            local_ptr = select_many(is_winner_thread, local_ptr + Vector::new(1u32), local_ptr);
+        }
+
+        for i in 0..this.k {
+            elements[i] = final_elements[i];
+        }
     }
 
     fn fuse_accumulators(this: &Self, accumulator: &mut Accumulator<P>, other: &Accumulator<P>) {
