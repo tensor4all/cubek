@@ -21,6 +21,49 @@ pub enum Writer<Out: NumericVector> {
     Perpendicular(PerpendicularWriter<Out>),
 }
 
+/// Build a [`ReduceOutputLayout`] from the output tensor and reduce/vec axes.
+///
+/// For simple reduces (`accumulator_length == 1`) `k_iter` never advances, so
+/// the layout degenerates to `position = write_index` — a flat enumeration of
+/// output vectors.
+///
+/// For topk-style reduces (`accumulator_length > 1`) the k slots live along
+/// `reduce_axis` with stride `stride(reduce_axis) / vec` vectors, and the vec
+/// axis (contiguous in the output, scalar stride 1) advances by one vector
+/// per step, so `write_stride = 1`. When the two axes coincide — i.e. a
+/// rank-1 output or any degenerate case where there is no separate SIMD axis
+/// — `write_stride` collapses to `0` and `num_writes` to `1`, so every
+/// `write_index` lands on the same k slot (should not matter because this collapse happens
+/// only if we have only one unit).
+#[cube]
+fn build_reduce_output_layout<Out: NumericVector>(
+    output: &VirtualTensor<Out::T, Out::N, ReadWrite>,
+    reduce_axis: usize,
+    out_vec_axis: usize,
+    #[comptime] accumulator_length: usize,
+) -> ReduceOutputLayout {
+    let vec = output.vector_size();
+    let num_vectored_reductions = output.shape(out_vec_axis) / vec;
+
+    if comptime![accumulator_length == 1] {
+        // Simple reduce: `write_index` is a flat vector offset into the
+        // output, which matches the pre-topk behavior.
+        ReduceOutputLayout::new(
+            num_vectored_reductions,
+            1,
+            num_vectored_reductions,
+            accumulator_length,
+        )
+    } else {
+        let k_stride = output.stride(reduce_axis) / vec;
+        // Branchless: `distinct` is 1 when reduce_axis != out_vec_axis, else 0.
+        let distinct = usize::cast_from(reduce_axis != out_vec_axis);
+        let write_stride = distinct;
+        let num_writes = distinct * num_vectored_reductions + (1 - distinct);
+        ReduceOutputLayout::new(k_stride, write_stride, num_writes, accumulator_length)
+    }
+}
+
 #[cube]
 impl<Out: NumericVector> Writer<Out> {
     pub fn new<P: ReducePrecision>(
@@ -110,13 +153,15 @@ impl<Out: NumericVector> ParallelWriter<Out> {
         write_index: usize,
         #[comptime] accumulator_format: AccumulatorFormat,
     ) -> ParallelWriter<Out> {
-        let num_vectors_vectorization_axis = output.shape(out_vec_axis) / output.vector_size();
+        let layout = build_reduce_output_layout::<Out>(
+            output,
+            reduce_axis,
+            out_vec_axis,
+            accumulator_format.len(),
+        );
 
         ParallelWriter::<Out> {
-            output: output.view_mut(ReduceOutputLayout::new(
-                num_vectors_vectorization_axis,
-                accumulator_format.len(),
-            )),
+            output: output.view_mut(layout),
             buffer: match accumulator_format {
                 AccumulatorFormat::Single => Value::new_single(Vector::empty()),
                 AccumulatorFormat::Multiple(length) => Value::new_Multiple(Array::new(length)),
@@ -136,7 +181,8 @@ impl<Out: NumericVector> ParallelWriter<Out> {
         let out = I::to_output_parallel::<Out::T>(inst, accumulator, self.axis_size);
 
         match out {
-            Value::Multiple(array) => {
+            Value::Multiple(array) =>
+            {
                 #[unroll]
                 for i in 0..self.accumulator_length {
                     let mut vec = self.buffer.multiple_mut()[i];
@@ -210,13 +256,15 @@ impl<Out: NumericVector> PerpendicularWriter<Out> {
         let input_vector_size = input.vector_size();
         let output_vector_size = output.vector_size();
 
-        let num_vectors_vectorization_axis = output.shape(out_vec_axis) / output.vector_size();
+        let layout = build_reduce_output_layout::<Out>(
+            output,
+            reduce_axis,
+            out_vec_axis,
+            accumulator_format.len(),
+        );
 
         PerpendicularWriter::<Out> {
-            output: output.view_mut(ReduceOutputLayout::new(
-                num_vectors_vectorization_axis,
-                accumulator_format.len(),
-            )),
+            output: output.view_mut(layout),
             axis_size: input.shape(reduce_axis),
             write_index,
             input_vector_size,

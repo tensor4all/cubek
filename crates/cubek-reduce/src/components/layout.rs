@@ -3,17 +3,33 @@ use cubecl::{
     std::tensor::layout::{Coords1d, Coords2d, Layout, LayoutExpand},
 };
 
+/// Maps a `(write_index, k_iter)` coordinate to a flat vector position in the
+/// output buffer. Strides are expressed in vector units (one step along the
+/// output's SIMD axis = one unit in `write_stride`).
+///
+/// For rank-1 outputs (or any case where `reduce_axis == out_vec_axis`), the
+/// caller should pass `write_stride = 0` and `num_writes = 1`, so the layout
+/// collapses to `position = k_iter * k_stride`.
 #[derive(CubeType, Clone)]
 pub struct ReduceOutputLayout {
-    num_vectored_reductions: usize,
+    k_stride: usize,
+    write_stride: usize,
+    num_writes: usize,
     accumulator_length: usize,
 }
 
 #[cube]
 impl ReduceOutputLayout {
-    pub fn new(num_vectored_reductions: usize, accumulator_length: usize) -> ReduceOutputLayout {
+    pub fn new(
+        k_stride: usize,
+        write_stride: usize,
+        num_writes: usize,
+        accumulator_length: usize,
+    ) -> ReduceOutputLayout {
         ReduceOutputLayout {
-            num_vectored_reductions,
+            k_stride,
+            write_stride,
+            num_writes,
             accumulator_length,
         }
     }
@@ -27,7 +43,7 @@ impl Layout for ReduceOutputLayout {
     fn to_source_pos(&self, coords: Self::Coordinates) -> Coords1d {
         let write_index = coords.0 as usize;
         let k_iter = coords.1 as usize;
-        k_iter * self.num_vectored_reductions + write_index
+        k_iter * self.k_stride + write_index * self.write_stride
     }
 
     fn to_source_pos_checked(&self, coords: Self::Coordinates) -> (Coords1d, bool) {
@@ -35,13 +51,10 @@ impl Layout for ReduceOutputLayout {
     }
 
     fn shape(&self) -> Self::Coordinates {
-        (
-            self.num_vectored_reductions as u32,
-            self.accumulator_length as u32,
-        )
+        (self.num_writes as u32, self.accumulator_length as u32)
     }
 
     fn is_in_bounds(&self, pos: Self::Coordinates) -> bool {
-        pos.0 < self.num_vectored_reductions as u32 && pos.1 < self.accumulator_length as u32
+        pos.0 < self.num_writes as u32 && pos.1 < self.accumulator_length as u32
     }
 }
