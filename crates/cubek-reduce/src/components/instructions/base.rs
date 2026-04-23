@@ -117,10 +117,10 @@ impl<X: CubePrimitive> SharedAccumulatorKind<X> {
                 let mut array = Array::new(sequence.len());
                 #[unroll]
                 for k_iter in 0..sequence.len() {
-                    array[i] = sequence[k_iter][i];
+                    array[k_iter] = sequence[k_iter][i];
                 }
                 Value::new_Multiple(array)
-            },
+            }
             SharedAccumulatorKind::Single(shared_memory) => Value::new_single(shared_memory[i]),
             SharedAccumulatorKind::None => Value::new_None(),
         }
@@ -128,13 +128,14 @@ impl<X: CubePrimitive> SharedAccumulatorKind<X> {
 
     pub fn set(&mut self, i: usize, value: Value<X>) {
         match self {
-            SharedAccumulatorKind::Multiple(sequence) => {
+            SharedAccumulatorKind::Multiple(sequence) =>
+            {
                 #[unroll]
                 for k_iter in 0..sequence.len() {
                     let mut shared_acc = sequence[k_iter];
-                    shared_acc[i] = value.multiple()[i];
+                    shared_acc[i] = value.multiple()[k_iter];
                 }
-            },
+            }
             SharedAccumulatorKind::Single(shared_memory) => shared_memory[i] = value.item(),
             SharedAccumulatorKind::None => {}
         }

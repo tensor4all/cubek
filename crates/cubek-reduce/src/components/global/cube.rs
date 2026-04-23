@@ -7,7 +7,7 @@ use crate::{
             Accumulator, ReduceStep, SharedAccumulator, fuse_accumulator_inplace, reduce_inplace,
         },
         readers::{Reader, cube::CubeReader},
-        writer::Writer,
+        writers::Writer,
     },
     routines::CubeBlueprint,
 };

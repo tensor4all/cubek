@@ -5,7 +5,7 @@ use crate::{
         global::idle_check,
         instructions::{Accumulator, ReduceStep, reduce_inplace},
         readers::{Reader, unit::UnitReader},
-        writer::Writer,
+        writers::Writer,
     },
     routines::UnitReduceBlueprint,
 };

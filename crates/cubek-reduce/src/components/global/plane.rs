@@ -5,7 +5,7 @@ use crate::{
         global::idle_check,
         instructions::{Accumulator, reduce_inplace},
         readers::{Reader, plane::PlaneReader},
-        writer::Writer,
+        writers::Writer,
     },
     routines::{PlaneMergeStrategy, PlaneReduceBlueprint},
 };
