@@ -102,8 +102,8 @@ pub fn reduce<R: Runtime>(
         &output.shape,
         axis,
         match operation {
-            ReduceOperationConfig::ArgTopK(k) => Some(k as usize),
-            ReduceOperationConfig::TopK(k) => Some(k as usize),
+            ReduceOperationConfig::ArgTopK(k) => Some(k),
+            ReduceOperationConfig::TopK(k) => Some(k),
             _ => None,
         },
     )?;
