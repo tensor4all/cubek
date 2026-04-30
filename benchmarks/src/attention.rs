@@ -1,6 +1,3 @@
-//! Attention benchmark registry. Strategy/problem IDs are stable strings; the
-//! tuner UI uses them to drive runs across cubek versions.
-
 use std::marker::PhantomData;
 
 use cubecl::{
@@ -76,12 +73,13 @@ pub fn problems() -> Vec<ItemDescriptor> {
 
 /// Run one (strategy, problem) pair on `cubecl::TestRuntime` with `f16`
 /// precision and return the raw samples.
-pub fn run(
-    strategy_id: &str,
-    problem_id: &str,
-    num_samples: usize,
-) -> Result<RunSamples, String> {
-    run_on::<cubecl::TestRuntime, half::f16>(Default::default(), strategy_id, problem_id, num_samples)
+pub fn run(strategy_id: &str, problem_id: &str, num_samples: usize) -> Result<RunSamples, String> {
+    run_on::<cubecl::TestRuntime, half::f16>(
+        Default::default(),
+        strategy_id,
+        problem_id,
+        num_samples,
+    )
 }
 
 pub fn run_on<R: Runtime, AP: AttentionPrecision>(
@@ -98,8 +96,8 @@ pub fn run_on<R: Runtime, AP: AttentionPrecision>(
 
     let problem = problem_for(problem_id, global_dtypes)
         .ok_or_else(|| format!("unknown problem: {problem_id}"))?;
-    let strategy = strategy_for(strategy_id)
-        .ok_or_else(|| format!("unknown strategy: {strategy_id}"))?;
+    let strategy =
+        strategy_for(strategy_id).ok_or_else(|| format!("unknown strategy: {strategy_id}"))?;
 
     let bench = AttentionBench::<R, AP> {
         problem,
@@ -115,10 +113,7 @@ pub fn run_on<R: Runtime, AP: AttentionPrecision>(
         .map_err(|e| format!("benchmark failed: {e}"))?
         .durations;
 
-    Ok(RunSamples {
-        durations,
-        tflops: None,
-    })
+    Ok(RunSamples { durations })
 }
 
 fn strategy_for(id: &str) -> Option<Strategy> {
@@ -258,7 +253,14 @@ impl<R: Runtime, AP: AttentionPrecision> Benchmark for AttentionBench<R, AP> {
         ) -> TensorHandle<R> {
             let dtype = T::as_type_native_unchecked();
             let tensor = TensorHandle::empty(client, shape, dtype);
-            random_uniform(client, 0., 1., tensor.clone().binding(), dtype.storage_type()).unwrap();
+            random_uniform(
+                client,
+                0.,
+                1.,
+                tensor.clone().binding(),
+                dtype.storage_type(),
+            )
+            .unwrap();
             tensor
         }
 
