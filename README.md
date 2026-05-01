@@ -19,16 +19,16 @@
 
 # Algorithms
 
-| Algorithms                                                                           | Variants                                                                 |
-| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| [Random](https://github.com/tracel-ai/cubek/tree/main/crates/cubek-random)           | `bernoulli` `normal` `uniform`                                           |
-| [Quantization](https://github.com/tracel-ai/cubek/tree/main/crates/cubek-quant)      | `symmetric` `per-tensor` `per-block` `q2` `q4` `q8` `fp4` `fp8`          |
-| [Reduction](https://github.com/tracel-ai/cubek/tree/main/crates/cubek-reduce)        | `mean` `sum` `prod` `max` `min` `maxabs` `topk` `arg[max\|min\|topk]`    |
-| [Matmul](https://github.com/tracel-ai/cubek/tree/main/crates/cubek-matmul)           | `mma` `unit` `tma` `multi-stage` `specialization` `ordered` `multi-rows` |
-| [GEMV](https://github.com/tracel-ai/cubek/tree/main/crates/cubek-matmul)             | `plane-parallel` `unit-perpendicular`                                    |
-| [Convolution](https://github.com/tracel-ai/cubek/tree/main/crates/cubek-convolution) | `mma` `unit` `tma` `multi-stage` `im2col`                                |
-| [Attention](https://github.com/tracel-ai/cubek/tree/main/crates/cubek-attention)     | `mma` `unit` `multi-rows`                                                |
-| [FFT](https://github.com/tracel-ai/cubek/tree/main/crates/cubek-fft)                 | `rfft` `irfft`                                                           |
+| Algorithms                                                                           | Variants                                                                                                |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| [Random](https://github.com/tracel-ai/cubek/tree/main/crates/cubek-random)           | `bernoulli` `normal` `uniform`                                                                          |
+| [Quantization](https://github.com/tracel-ai/cubek/tree/main/crates/cubek-quant)      | `symmetric` `per-tensor` `per-block` `q2` `q4` `q8` `fp4` `fp8`                                         |
+| [Reduction](https://github.com/tracel-ai/cubek/tree/main/crates/cubek-reduce)        | `mean` `sum` `prod` `max` `min` `maxabs` `topk` `arg[max\|min\|topk]` `per-cube` `per-plane` `per-unit` |
+| [Matmul](https://github.com/tracel-ai/cubek/tree/main/crates/cubek-matmul)           | `mma` `unit` `tma` `multi-stage` `specialization` `ordered` `multi-rows`                                |
+| [GEMV](https://github.com/tracel-ai/cubek/tree/main/crates/cubek-matmul)             | `plane-parallel` `unit-perpendicular`                                                                   |
+| [Convolution](https://github.com/tracel-ai/cubek/tree/main/crates/cubek-convolution) | `mma` `unit` `tma` `multi-stage` `im2col`                                                               |
+| [Attention](https://github.com/tracel-ai/cubek/tree/main/crates/cubek-attention)     | `mma` `unit` `multi-rows`                                                                               |
+| [FFT](https://github.com/tracel-ai/cubek/tree/main/crates/cubek-fft)                 | `rfft` `irfft`                                                                                          |
 
 # Contributing
 
