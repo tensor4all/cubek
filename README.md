@@ -22,11 +22,13 @@
 | Algorithms                                                                           | Variants                                                                 |
 | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
 | [Random](https://github.com/tracel-ai/cubek/tree/main/crates/cubek-random)           | `bernoulli` `normal` `uniform`                                           |
-| [Quantization](https://github.com/tracel-ai/cubek/tree/main/crates/cubek-quant)      | `symmetric` `per-block` `per-tensor` `q2` `q4` `q8` `fp4`                |
-| [Reduction](https://github.com/tracel-ai/cubek/tree/main/crates/cubek-reduce)        | `mean` `sum` `prod` `max` `min` `arg[max\|min]` `per-cube` `per-plane`   |
+| [Quantization](https://github.com/tracel-ai/cubek/tree/main/crates/cubek-quant)      | `symmetric` `per-tensor` `per-block` `q2` `q4` `q8` `fp4` `fp8`          |
+| [Reduction](https://github.com/tracel-ai/cubek/tree/main/crates/cubek-reduce)        | `mean` `sum` `prod` `max` `min` `maxabs` `topk` `arg[max\|min\|topk]`    |
 | [Matmul](https://github.com/tracel-ai/cubek/tree/main/crates/cubek-matmul)           | `mma` `unit` `tma` `multi-stage` `specialization` `ordered` `multi-rows` |
+| [GEMV](https://github.com/tracel-ai/cubek/tree/main/crates/cubek-matmul)             | `plane-parallel` `unit-perpendicular`                                    |
 | [Convolution](https://github.com/tracel-ai/cubek/tree/main/crates/cubek-convolution) | `mma` `unit` `tma` `multi-stage` `im2col`                                |
 | [Attention](https://github.com/tracel-ai/cubek/tree/main/crates/cubek-attention)     | `mma` `unit` `multi-rows`                                                |
+| [FFT](https://github.com/tracel-ai/cubek/tree/main/crates/cubek-fft)                 | `rfft` `irfft`                                                           |
 
 # Contributing
 
@@ -34,5 +36,5 @@ If you want to contribute new kernels, please read the [`GUIDE.md`](./GUIDE.md).
 
 # Running tests
 
-The full testing guide — suites, `CUBE_TEST_MODE`, failure-message format, and
-filter syntax — lives in [`cubek-test-utils`](./crates/cubek-test-utils/README.md).
+See [`cubek-test-utils`](./crates/cubek-test-utils/README.md) for the test
+configuration (`cubek.toml`), policies, and filter syntax.
