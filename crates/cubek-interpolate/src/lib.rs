@@ -14,8 +14,8 @@ use crate::modes::bilinear::interpolate_bilinear_launch;
 use crate::modes::lanczos3::interpolate_lanczos3_launch;
 use crate::modes::nearest::interpolate_nearest_launch;
 
-#[cfg(feature = "cpu-reference")]
-pub mod cpu_reference;
+#[cfg(any(feature = "cpu-reference", feature = "benchmarks"))]
+pub mod eval;
 
 /// Interpolate operation
 ///
