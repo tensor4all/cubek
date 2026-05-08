@@ -3,7 +3,7 @@ use cubek_test_utils::{HostData, Progress};
 
 use crate::definition::InterpolateProblem;
 use crate::eval::benchmarks::strategy::InterpolateStrategy;
-use crate::eval::cpu_reference::{cpu_reference_result, strategy_result};
+use crate::cpu_reference::{cpu_reference_result, strategy_result};
 
 pub struct InterpolateCorrectness;
 

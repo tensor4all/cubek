@@ -11,7 +11,7 @@ use cubek_test_utils::{RunSamples, TestInput};
 
 use crate::definition::InterpolateProblem;
 use crate::eval::benchmarks::strategy::InterpolateStrategy;
-use crate::interpolate;
+use crate::{interpolate, interpolate_backward};
 
 pub fn bench(
     _strategy: &InterpolateStrategy,
@@ -51,32 +51,60 @@ impl Benchmark for InterpolateBench {
     type Output = TensorHandle<TestRuntime>;
 
     fn prepare(&self) -> Self::Input {
-        TestInput::builder(self.client.clone(), Shape::new(self.problem.input_shape))
+        let shape = match &self.problem {
+            InterpolateProblem::InterpolateForward(prob) => Shape::new(prob.input_shape),
+            InterpolateProblem::InterpolateBackward(prob) => Shape::new(prob.out_grad_shape),
+        };
+        TestInput::builder(self.client.clone(), shape)
             .dtype(self.dtype)
             .uniform(0, -1., 1.)
             .generate_without_host_data()
     }
 
     fn execute(&self, input: Self::Input) -> Result<TensorHandle<TestRuntime>, String> {
-        let [n, _, _, c] = self.problem.input_shape;
-        let output_shape = vec![
-            n,
-            self.problem.output_size[0],
-            self.problem.output_size[1],
-            c,
-        ];
-        let output = TensorHandle::empty(&self.client, output_shape, self.dtype);
+        match &self.problem {
+            InterpolateProblem::InterpolateForward(prob) => {
+                let [n, _, _, c] = prob.input_shape;
+                let output_shape = vec![n, prob.output_size[0], prob.output_size[1], c];
+                let output = TensorHandle::empty(&self.client, output_shape, self.dtype);
 
-        interpolate(
-            &self.client,
-            input.binding(),
-            output.clone().binding(),
-            self.problem.options.clone(),
-            self.dtype,
-        )
-        .map_err(|err| format!("{err}"))?;
+                interpolate(
+                    &self.client,
+                    input.binding(),
+                    output.clone().binding(),
+                    prob.options.clone(),
+                    self.dtype,
+                )
+                .map_err(|err| format!("{err}"))?;
 
-        Ok(output)
+                Ok(output)
+            }
+            InterpolateProblem::InterpolateBackward(prob) => {
+                let [n, _, _, c] = prob.out_grad_shape;
+                let input_grad_shape = vec![n, prob.input_size[0], prob.input_size[1], c];
+
+                // Random input tensor for the backward pass. The actual values don't matter
+                // for benchmarking, so we just fill it with random data.
+                let backward_input = TestInput::builder(self.client.clone(), input_grad_shape.clone())
+                    .dtype(self.dtype)
+                    .uniform(0, -1., 1.)
+                    .generate_without_host_data();
+
+                let output = TensorHandle::empty(&self.client, input_grad_shape, self.dtype);
+
+                interpolate_backward(
+                    &self.client,
+                    backward_input.binding(),
+                    input.clone().binding(),
+                    output.clone().binding(),
+                    prob.options.clone(),
+                    self.dtype,
+                )
+                .map_err(|err| format!("{err}"))?;
+
+                Ok(output)
+            }
+        }
     }
 
     fn num_samples(&self) -> usize {
@@ -84,11 +112,18 @@ impl Benchmark for InterpolateBench {
     }
 
     fn name(&self) -> String {
-        format!(
-            "interpolate-{:?}-{:?}-{:?}-{:?}",
-            self.dtype, self.problem.options.mode, self.device, self.problem.input_shape,
-        )
-        .to_lowercase()
+        match &self.problem {
+            InterpolateProblem::InterpolateForward(prob) => format!(
+                "interpolate-{:?}-{:?}-{:?}-{:?}",
+                self.dtype, prob.options.mode, self.device, prob.input_shape,
+            )
+            .to_lowercase(),
+            InterpolateProblem::InterpolateBackward(prob) => format!(
+                "interpolate-backward-{:?}-{:?}-{:?}-{:?}",
+                self.dtype, prob.options.mode, self.device, prob.out_grad_shape,
+            )
+            .to_lowercase(),
+        }
     }
 
     fn sync(&self) {
