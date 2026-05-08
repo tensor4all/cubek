@@ -1,6 +1,6 @@
+mod backward;
 #[cfg(feature = "benchmarks")]
 mod bench_catalog;
-mod backward;
 mod forward;
 
 use cubecl::{TestRuntime, client::ComputeClient, ir::StorageType, std::tensor::TensorHandle};

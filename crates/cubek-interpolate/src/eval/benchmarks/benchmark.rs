@@ -85,10 +85,11 @@ impl Benchmark for InterpolateBench {
 
                 // Random input tensor for the backward pass. The actual values don't matter
                 // for benchmarking, so we just fill it with random data.
-                let backward_input = TestInput::builder(self.client.clone(), input_grad_shape.clone())
-                    .dtype(self.dtype)
-                    .uniform(0, -1., 1.)
-                    .generate_without_host_data();
+                let backward_input =
+                    TestInput::builder(self.client.clone(), input_grad_shape.clone())
+                        .dtype(self.dtype)
+                        .uniform(0, -1., 1.)
+                        .generate_without_host_data();
 
                 let output = TensorHandle::empty(&self.client, input_grad_shape, self.dtype);
 
