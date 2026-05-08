@@ -70,22 +70,24 @@ fn elems_for(spec: &AttentionSpec) -> AttentionElems {
     )
 }
 
-// One #[test] per (strategy, problem) so failures localise. The catalogue is
-// small enough for a static list; if it grows, switching to a build script or
-// `rstest` parametrisation is the obvious next step.
-
 const STRATEGY: &str = "blackbox_accelerated_inferred";
 
 #[test]
-#[ignore = "TODO - FAILS"]
 fn bert_blackbox_accelerated_inferred() {
     run_pair(STRATEGY, "bert");
 }
 
 #[test]
-#[ignore = "TODO - FAILS"]
 fn gpt2_blackbox_accelerated_inferred() {
     run_pair(STRATEGY, "gpt2");
+}
+
+/// Fast regression for the causal+materialized-mask absolute-row bug. Real
+/// GPT-2 takes ~50s; this 64×64 variant catches the same kernel path in
+/// under a second.
+#[test]
+fn gpt2_tiny_blackbox_accelerated_inferred() {
+    run_pair(STRATEGY, "gpt2_tiny");
 }
 
 #[test]
@@ -101,7 +103,6 @@ fn long_context_blackbox_accelerated_inferred() {
 }
 
 #[test]
-#[ignore = "TODO - FAILS"]
 fn encoder_decoder_blackbox_accelerated_inferred() {
     run_pair(STRATEGY, "encoder_decoder");
 }

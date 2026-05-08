@@ -68,6 +68,15 @@ pub fn problems() -> Vec<CatalogEntry<AttentionSpec>> {
             },
         ),
         CatalogEntry::new(
+            "gpt2_tiny",
+            "GPT-2 tiny (b=1 h=1 sq=skv=64 d=64, causal+mask)",
+            AttentionSpec {
+                dims: dims(1, 1, 64, 64, 64),
+                masked: true,
+                options: causal_masked.clone(),
+            },
+        ),
+        CatalogEntry::new(
             "llama",
             "Llama (b=4 h=32 sq=skv=2048 d=128, causal+mask)",
             AttentionSpec {

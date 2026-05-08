@@ -41,25 +41,21 @@ fn run(strategy_id: &str, problem_id: &str) {
 }
 
 #[test]
-#[ignore = "TODO - FAILS"]
 fn sum_axis2_32x512x4095_unit_parallel() {
     run("unit_parallel", "sum_axis2_32x512x4095");
 }
 
 #[test]
-#[ignore = "TODO - FAILS"]
 fn sum_axis2_32x512x4095_plane_parallel() {
     run("plane_parallel", "sum_axis2_32x512x4095");
 }
 
 #[test]
-#[ignore = "TODO - FAILS"]
 fn arg_topk1_axis2_32x512x4095_unit_parallel() {
     run("unit_parallel", "arg_topk1_axis2_32x512x4095");
 }
 
 #[test]
-#[ignore = "TODO - FAILS"]
 fn arg_topk2_axis2_32x512x4095_unit_parallel() {
     run("unit_parallel", "arg_topk2_axis2_32x512x4095");
 }

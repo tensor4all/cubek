@@ -37,26 +37,44 @@ fn run(strategy_id: &str, problem_id: &str) {
         .enforce();
 }
 
+const STRATEGY: &str = "default";
+
 #[test]
-#[ignore = "TODO - FAILS"]
-fn nearest_upsample_2x_64x64_default() {
-    run("default", "NEAREST_UPSAMPLE_2X_64X64");
+fn nearest_downsample_default() {
+    run(
+        STRATEGY,
+        "NEAREST_DOWNSAMPLE_8_BATCH_2_CHANNELS_2048X1024_TO_512X512",
+    );
 }
 
 #[test]
-#[ignore = "TODO - FAILS"]
-fn nearest_downsample_2x_256x256_default() {
-    run("default", "NEAREST_DOWNSAMPLE_2X_256X256");
+fn bilinear_downsample_default() {
+    run(
+        STRATEGY,
+        "BILINEAR_DOWNSAMPLE_8_BATCH_2_CHANNELS_2048X1024_TO_512X512",
+    );
 }
 
 #[test]
-#[ignore = "TODO - FAILS"]
-fn nearest_upsample_4x_512x512_default() {
-    run("default", "NEAREST_UPSAMPLE_4X_512X512");
+fn bicubic_downsample_default() {
+    run(
+        STRATEGY,
+        "BICUBIC_DOWNSAMPLE_8_BATCH_2_CHANNELS_2048X1024_TO_512X512",
+    );
 }
 
 #[test]
-#[ignore = "TODO - FAILS"]
-fn nearest_downsample_4x_2048x2048_default() {
-    run("default", "NEAREST_DOWNSAMPLE_4X_2048X2048");
+fn lanczos3_downsample_default() {
+    run(
+        STRATEGY,
+        "LANCZOS3_DOWNSAMPLE_8_BATCH_2_CHANNELS_2048X1024_TO_512X512",
+    );
+}
+
+#[test]
+fn nearest_backward_downsample_default() {
+    run(
+        STRATEGY,
+        "NEAREST_BACKWARD_DOWNSAMPLE_8_BATCH_2_CHANNELS_2048X1024_TO_512X512",
+    );
 }

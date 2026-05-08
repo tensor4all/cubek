@@ -22,9 +22,9 @@ pub fn strategy_result(
 
     let input_shape = vec![
         out_grad_shape[0],
-        out_grad_shape[1],
         problem.input_size[0],
         problem.input_size[1],
+        out_grad_shape[3],
     ];
     let (input_handle, _input_host) = make_random_f32_host(&client, input_shape.clone(), seed);
 

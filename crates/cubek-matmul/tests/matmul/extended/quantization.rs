@@ -1,7 +1,7 @@
 use cubecl::{Runtime, TestRuntime, features::TypeUsage, ir::ElemType, ir::FloatKind, prelude::*};
 use cubek_matmul::{
-    cpu_reference::matmul_cpu_reference,
     definition::{MatmulElems, MatmulGlobalElems, MatmulProblem},
+    eval::cpu_reference::matmul_cpu_reference,
     launch::Strategy,
     launch::launch_ref,
 };

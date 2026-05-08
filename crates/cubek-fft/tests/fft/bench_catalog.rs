@@ -37,25 +37,21 @@ fn run(strategy_id: &str, problem_id: &str) {
 }
 
 #[test]
-#[ignore = "TODO - FAILS"]
 fn forward_5x2x2048_default() {
     run("default", "forward_5x2x2048");
 }
 
 #[test]
-#[ignore = "TODO - FAILS"]
 fn inverse_5x2x2048_default() {
     run("default", "inverse_5x2x2048");
 }
 
 #[test]
-#[ignore = "TODO - FAILS"]
 fn forward_1x4096_default() {
     run("default", "forward_1x4096");
 }
 
 #[test]
-#[ignore = "TODO - FAILS"]
 fn forward_1x16384_default() {
     run("default", "forward_1x16384");
 }

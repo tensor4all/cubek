@@ -60,7 +60,6 @@ fn run_gemv(strategy_id: &str, problem_id: &str) {
 }
 
 #[test]
-#[ignore = "TODO - FAILS"]
 fn gemm_rect_1x512x512x512_rr_f16() {
     run_gemm("simple_cyclic_cmma", "rect_1x512x512x512_rr_f16");
 }
