@@ -9,8 +9,8 @@ use cubecl::{
 };
 use cubek_test_utils::{RunSamples, TestInput};
 
-use crate::eval::benchmarks::strategy::InterpolateStrategy;
 use crate::definition::InterpolateProblem;
+use crate::eval::benchmarks::strategy::InterpolateStrategy;
 use crate::interpolate;
 
 pub fn bench(

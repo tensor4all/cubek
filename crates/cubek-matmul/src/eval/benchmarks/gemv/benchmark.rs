@@ -11,8 +11,8 @@ use cubecl::{
 use cubek_std::InputBinding;
 use cubek_test_utils::{RunSamples, TestInput};
 
-use crate::eval::benchmarks::gemv::problem::{GemvProblem, ProblemKind};
 use crate::definition::MatmulElems;
+use crate::eval::benchmarks::gemv::problem::{GemvProblem, ProblemKind};
 use crate::launch::{Strategy, launch_ref};
 
 pub fn bench(

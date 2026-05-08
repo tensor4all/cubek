@@ -11,8 +11,7 @@ use cubek_test_utils::{RunSamples, TestInput};
 
 use super::problem::{AttentionSpec, build_problem};
 use crate::definition::{
-    AttentionGlobalTypes, AttentionIdent, AttentionPrecision, AttentionProblem,
-    attention_types::*,
+    AttentionGlobalTypes, AttentionIdent, AttentionPrecision, AttentionProblem, attention_types::*,
 };
 use crate::launch::{self, Strategy};
 
@@ -93,28 +92,13 @@ impl<AP: AttentionPrecision> Benchmark for AttentionBench<AP> {
     fn prepare(&self) -> Self::Input {
         let client = <TestRuntime as Runtime>::client(&self.device);
 
-        let query = make_uniform::<QG<AP>>(
-            &client,
-            self.problem.shape(AttentionIdent::Query),
-            0,
-        );
-        let key = make_uniform::<KG<AP>>(
-            &client,
-            self.problem.shape(AttentionIdent::Key),
-            1,
-        );
-        let value = make_uniform::<VG<AP>>(
-            &client,
-            self.problem.shape(AttentionIdent::Value),
-            2,
-        );
-        let mask = self.problem.masked.then(|| {
-            make_uniform::<MSK<AP>>(
-                &client,
-                self.problem.shape(AttentionIdent::Mask),
-                3,
-            )
-        });
+        let query = make_uniform::<QG<AP>>(&client, self.problem.shape(AttentionIdent::Query), 0);
+        let key = make_uniform::<KG<AP>>(&client, self.problem.shape(AttentionIdent::Key), 1);
+        let value = make_uniform::<VG<AP>>(&client, self.problem.shape(AttentionIdent::Value), 2);
+        let mask = self
+            .problem
+            .masked
+            .then(|| make_uniform::<MSK<AP>>(&client, self.problem.shape(AttentionIdent::Mask), 3));
 
         AttentionInputs {
             query,
