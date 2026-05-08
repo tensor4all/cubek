@@ -59,10 +59,6 @@ fn run_gemv(strategy_id: &str, problem_id: &str) {
         .enforce();
 }
 
-// gemm: 22 shapes × 4 layouts × 2 precisions = 176 entries in the catalogue.
-// We sample a handful of representative shapes; row/row + f16 keeps the matrix
-// small in code while still exercising a CMMA-friendly path.
-
 #[test]
 #[ignore = "TODO - FAILS"]
 fn gemm_rect_1x512x512x512_rr_f16() {
@@ -81,7 +77,6 @@ fn gemm_square_1x6144_rr_f16() {
     run_gemm("simple_cyclic_cmma", "square_1x6144_rr_f16");
 }
 
-// gemv: 4 entries today.
 #[test]
 fn gemv_vecmat_b2_out4096_k8192_rr() {
     run_gemv("simple_vecmat", "vecmat_b2_out4096_k8192_rr");
