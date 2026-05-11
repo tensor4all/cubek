@@ -5,6 +5,8 @@
 //! - [`cpu_reference_result`] runs the naive flash-attention-v2 reference on
 //!   the same seeded inputs and returns its output as a [`HostData`].
 
+#![allow(clippy::needless_range_loop)]
+
 use core::f32;
 
 use cubecl::{TestRuntime, client::ComputeClient, std::tensor::TensorHandle, zspace::Shape};
@@ -46,7 +48,7 @@ pub fn strategy_result(
             &problem.global_dtypes,
             AttentionOptions {
                 causal: problem.options.causal,
-                accumulator_precision: problem.options.accumulator_precision.clone(),
+                accumulator_precision: problem.options.accumulator_precision,
             },
         )
         .into()
