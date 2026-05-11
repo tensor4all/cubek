@@ -1,10 +1,15 @@
 use super::{
-    super::{address_type_for, decompose_linear, end_index, launch_config_for, shape_divmod, start_index},
-    pool::{Position, view4d},
+    super::{
+        address_type_for, decompose_linear, end_index, launch_config_for, shape_divmod, start_index,
+    },
+    pool2d::{Position, view4d},
 };
 use crate::definition::{AdaptiveAvgPoolOptions, PoolError};
 use cubecl::{
-    Runtime, num_traits::Zero, prelude::TensorBinding, prelude::*,
+    Runtime,
+    num_traits::Zero,
+    prelude::TensorBinding,
+    prelude::*,
     std::{FastDivmod, tensor::View},
 };
 

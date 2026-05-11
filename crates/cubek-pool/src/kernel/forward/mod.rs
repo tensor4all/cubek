@@ -1,12 +1,12 @@
 mod adaptive_avg_pool2d;
 mod avg_pool2d;
 mod max_pool2d;
-mod pool;
+mod pool2d;
 
 pub(crate) use adaptive_avg_pool2d::*;
 pub(crate) use avg_pool2d::*;
 pub(crate) use max_pool2d::*;
-pub(crate) use pool::*;
+pub(crate) use pool2d::*;
 
 use crate::definition::{PoolError, PoolMode};
 use cubecl::{Runtime, client::ComputeClient, prelude::TensorBinding, prelude::*};

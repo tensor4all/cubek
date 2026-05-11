@@ -1,8 +1,8 @@
 use super::{
     super::{address_type_for, launch_config_for, shape_divmod},
-    pool::{
-        Pool2dDirectArgsLaunch, Pool2dDirectStrategy, Pool2dDirectStrategyFamily, Position,
-        pool, view4d,
+    pool2d::{
+        Pool2dDirectArgsLaunch, Pool2dDirectStrategy, Pool2dDirectStrategyFamily, Position, pool2d,
+        view4d,
     },
 };
 use crate::definition::{MaxPoolOptions, PoolError};
@@ -114,7 +114,7 @@ pub(crate) fn max_pool2d_launch<R: Runtime>(
     let launch = launch_config_for(client, dtype, &input, &output);
     let address_type = address_type_for((&input, dtype.size()), &[(&output, dtype.size())]);
 
-    pool::launch::<MaxPoolStrategy, R>(
+    pool2d::launch::<MaxPoolStrategy, R>(
         client,
         launch.cube_count,
         launch.cube_dim,
@@ -158,7 +158,7 @@ pub(crate) fn max_pool2d_with_indices_launch<R: Runtime>(
         &[(&output, dtype.size()), (&indices, dtype.size())],
     );
 
-    pool::launch::<MaxPoolWithIndicesStrategy, R>(
+    pool2d::launch::<MaxPoolWithIndicesStrategy, R>(
         client,
         launch.cube_count,
         launch.cube_dim,

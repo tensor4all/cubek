@@ -1,7 +1,7 @@
 use super::{
     super::{address_type_for, launch_config_for, shape_divmod},
-    pool::{
-        Pool2dDirectArgsLaunch, Pool2dDirectStrategy, Pool2dDirectStrategyFamily, Position, pool,
+    pool2d::{
+        Pool2dDirectArgsLaunch, Pool2dDirectStrategy, Pool2dDirectStrategyFamily, Position, pool2d,
         view4d,
     },
 };
@@ -98,7 +98,7 @@ pub(crate) fn avg_pool2d_launch<R: Runtime>(
     let padded_0 = in_h as u32 + 2u32 * options.window.padding[0] as u32;
     let padded_1 = in_w as u32 + 2u32 * options.window.padding[1] as u32;
 
-    pool::launch::<AvgPoolStrategy, R>(
+    pool2d::launch::<AvgPoolStrategy, R>(
         client,
         launch.cube_count,
         launch.cube_dim,
