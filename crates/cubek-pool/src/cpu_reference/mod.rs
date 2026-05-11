@@ -11,10 +11,73 @@ use crate::{
         },
         geometry::PoolGeometry,
     },
-    definition::{MaxPoolOptions, PoolBackwardProblem, PoolForwardProblem, PoolMode},
+    definition::{MaxPoolOptions, PoolBackwardProblem, PoolForwardProblem, PoolMode, PoolProblem},
 };
-use cubecl::zspace::{Shape, Strides};
-use cubek_test_utils::{HostData, HostDataVec};
+use cubecl::{
+    TestRuntime,
+    client::ComputeClient,
+    ir::StorageType,
+    prelude::*,
+    std::tensor::TensorHandle,
+    zspace::{Shape, Strides},
+};
+use cubek_test_utils::{HostData, HostDataVec, Progress, TestInput};
+
+pub(crate) fn f32_storage_type() -> StorageType {
+    f32::as_type_native_unchecked().storage_type()
+}
+
+pub(crate) fn i32_storage_type() -> StorageType {
+    i32::as_type_native_unchecked().storage_type()
+}
+
+pub(crate) fn make_random_f32_host(
+    client: &ComputeClient<TestRuntime>,
+    shape: Vec<usize>,
+    seed: u64,
+) -> (TensorHandle<TestRuntime>, HostData) {
+    TestInput::builder(client.clone(), shape)
+        .uniform(seed, -1., 1.)
+        .generate_with_f32_host_data()
+}
+
+pub(crate) fn make_zero_handle(
+    client: &ComputeClient<TestRuntime>,
+    shape: Vec<usize>,
+    dtype: StorageType,
+) -> TensorHandle<TestRuntime> {
+    TestInput::builder(client.clone(), shape)
+        .dtype(dtype)
+        .zeros()
+        .generate()
+}
+
+pub(crate) fn output_shape_for(mode: &PoolMode<2>, input_shape: &Shape) -> Shape {
+    mode.output_shape(input_shape)
+}
+
+pub fn strategy_result(
+    client: ComputeClient<TestRuntime>,
+    problem: PoolProblem<2>,
+    seed: u64,
+) -> Result<HostData, String> {
+    match problem {
+        PoolProblem::Forward(prob) => forward::strategy_result(client, prob, seed),
+        PoolProblem::Backward(prob) => backward::strategy_result(client, prob, seed),
+    }
+}
+
+pub fn cpu_reference_result(
+    client: ComputeClient<TestRuntime>,
+    problem: PoolProblem<2>,
+    seed: u64,
+    progress: Option<&Progress>,
+) -> Result<HostData, String> {
+    match problem {
+        PoolProblem::Forward(prob) => forward::cpu_reference_result(client, prob, seed, progress),
+        PoolProblem::Backward(prob) => backward::cpu_reference_result(client, prob, seed, progress),
+    }
+}
 
 pub fn cpu_reference_pool<const N: usize>(
     input: &HostData,

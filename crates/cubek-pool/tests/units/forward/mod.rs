@@ -2,12 +2,15 @@ mod adaptive_avg_pool2d;
 mod avg_pool2d;
 mod max_pool2d;
 
-use super::{build_output_tensor, output_host_f32, validate_test};
+use super::{
+    build_output_tensor, indices_storage_type, output_host_f32, output_host_i32, validate_indices,
+    validate_test,
+};
 use cubecl::{TestRuntime, client::ComputeClient, zspace::Shape};
 use cubek_pool::{
-    cpu_reference::{cpu_reference_pool, geometry::PoolGeometry},
+    cpu_reference::{cpu_reference_max_pool_indices, cpu_reference_pool, geometry::PoolGeometry},
     definition::{PoolForwardProblem, PoolMode},
-    pool2d,
+    pool2d, pool2d_with_indices,
 };
 use cubek_test_utils::TestInput;
 
@@ -38,15 +41,58 @@ pub fn run_pool_test(
     let output_shape = problem.output_shape(&problem.input_shape).to_vec();
     let output = build_output_tensor(&client, output_shape.clone(), input.dtype);
 
-    let result = pool2d(
-        &client,
-        input.clone().binding(),
-        output.clone().binding(),
-        problem.mode.clone(),
-        input.dtype,
-    );
+    let indices = if problem.with_indices {
+        Some(build_output_tensor(
+            &client,
+            output_shape.to_vec(),
+            indices_storage_type(),
+        ))
+    } else {
+        None
+    };
+
+    let result = if problem.with_indices {
+        pool2d_with_indices(
+            &client,
+            input.clone().binding(),
+            output.clone().binding(),
+            indices.clone().unwrap().binding(),
+            problem.mode.clone(),
+            input.dtype,
+        )
+    } else {
+        pool2d(
+            &client,
+            input.clone().binding(),
+            output.clone().binding(),
+            problem.mode.clone(),
+            input.dtype,
+        )
+    };
 
     let output_host = output_host_f32(&client, output);
+    let indices_host = if problem.with_indices {
+        Some(output_host_i32(
+            &client,
+            indices.expect("indices tensor missing"),
+        ))
+    } else {
+        None
+    };
+
+    if problem.with_indices {
+        if let PoolMode::Max(opts) = &problem.mode {
+            let indices_reference =
+                cpu_reference_max_pool_indices(&input_data, opts, &output_shape);
+            validate_indices(
+                indices_host
+                    .as_ref()
+                    .expect("indices host data missing")
+                    .clone(),
+                indices_reference,
+            );
+        }
+    }
 
     let reference = cpu_reference_pool(&input_data, problem);
 

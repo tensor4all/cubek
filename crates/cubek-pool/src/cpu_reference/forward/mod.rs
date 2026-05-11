@@ -6,7 +6,16 @@ pub use adaptive_avg_pool::run_adaptive_avg_pool;
 pub use avg_pool::run_avg_pool;
 pub use max_pool::{run_max_pool, run_max_pool_with_indices};
 
+use super::{
+    f32_storage_type, i32_storage_type, make_random_f32_host, make_zero_handle, output_shape_for,
+};
 use crate::cpu_reference::decode_index;
+use crate::definition::PoolForwardProblem;
+use crate::{pool2d, pool2d_with_indices};
+use cubecl::{TestRuntime, client::ComputeClient};
+use cubek_test_utils::{
+    ExecutionOutcome, HostData, HostDataType, Progress, launch_and_capture_outcome,
+};
 
 pub(crate) fn get_window_coords<const N: usize>(
     spatial_out: &[usize],
@@ -40,4 +49,73 @@ pub(crate) fn row_major_strides_vec(shape: &[usize]) -> Vec<usize> {
         strides[i] = strides[i + 1] * shape[i + 1];
     }
     strides
+}
+
+pub fn strategy_result(
+    client: ComputeClient<TestRuntime>,
+    problem: PoolForwardProblem<2>,
+    seed: u64,
+) -> Result<HostData, String> {
+    let dtype = f32_storage_type();
+    let (input_handle, _input_host) =
+        make_random_f32_host(&client, problem.input_shape.to_vec(), seed);
+
+    let output_shape = output_shape_for(&problem.mode, &problem.input_shape);
+    let output_handle = make_zero_handle(&client, output_shape.to_vec(), dtype);
+
+    let outcome = launch_and_capture_outcome(&client, |c| {
+        if problem.with_indices {
+            let indices_handle = make_zero_handle(
+                &client,
+                output_shape.to_vec(),
+                i32_storage_type(),
+            );
+            pool2d_with_indices::<TestRuntime>(
+                c,
+                input_handle.clone().binding(),
+                output_handle.clone().binding(),
+                indices_handle.clone().binding(),
+                problem.mode.clone(),
+                dtype,
+            )
+            .into()
+        } else {
+            pool2d::<TestRuntime>(
+                c,
+                input_handle.clone().binding(),
+                output_handle.clone().binding(),
+                problem.mode.clone(),
+                dtype,
+            )
+            .into()
+        }
+    });
+
+    match outcome {
+        ExecutionOutcome::CompileError(e) => Err(format!("compile error: {e}")),
+        ExecutionOutcome::Executed => Ok(HostData::from_tensor_handle(
+            &client,
+            output_handle,
+            HostDataType::F32,
+        )),
+    }
+}
+
+pub fn cpu_reference_result(
+    client: ComputeClient<TestRuntime>,
+    problem: PoolForwardProblem<2>,
+    seed: u64,
+    progress: Option<&Progress>,
+) -> Result<HostData, String> {
+    let output_shape = output_shape_for(&problem.mode, &problem.input_shape);
+
+    if let Some(p) = progress {
+        let total: usize = output_shape.iter().product();
+        p.set_total(total as u64);
+    }
+
+    let (_input_handle, input_host) =
+        make_random_f32_host(&client, problem.input_shape.to_vec(), seed);
+
+    Ok(crate::cpu_reference::cpu_reference_pool(&input_host, problem))
 }
