@@ -68,7 +68,7 @@ pub struct Pool2dDirectArgs {
 }
 
 #[cube(launch, address_type = "dynamic")]
-pub fn pool2d_direct<E: Numeric, N: Size, S: Pool2dDirectStrategyFamily>(
+pub fn pool<E: Numeric, N: Size, S: Pool2dDirectStrategyFamily>(
     input: &Tensor<Vector<E, N>>,
     output: &mut View<Vector<E, N>, Position, ReadWrite>,
     indices: &mut S::Indices<N>,

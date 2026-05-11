@@ -1,15 +1,12 @@
 use super::{
-    super::shape_divmod,
-    pool2d::{
+    super::{address_type_for, launch_config_for, shape_divmod},
+    pool::{
         Pool2dDirectArgsLaunch, Pool2dDirectStrategy, Pool2dDirectStrategyFamily, Position,
-        pool2d_direct, view4d,
+        pool, view4d,
     },
 };
 use crate::definition::{MaxPoolOptions, PoolError};
-use cubecl::{
-    CubeDim, Runtime, calculate_cube_count_elemwise, num_traits::Zero, prelude::TensorBinding,
-    prelude::*, std::tensor::View, tensor_vector_size_parallel,
-};
+use cubecl::{Runtime, num_traits::Zero, prelude::TensorBinding, prelude::*, std::tensor::View};
 
 struct MaxPoolStrategy;
 struct MaxPoolWithIndicesStrategy;
@@ -114,32 +111,20 @@ pub(crate) fn max_pool2d_launch<R: Runtime>(
     options: MaxPoolOptions<2>,
     dtype: StorageType,
 ) -> Result<(), PoolError> {
-    let vector_size = tensor_vector_size_parallel(
-        client.io_optimized_vector_sizes(dtype.size()),
-        &input.shape,
-        &input.strides,
-        input.shape.len() - 1,
-    );
+    let launch = launch_config_for(client, dtype, &input, &output);
+    let address_type = address_type_for((&input, dtype.size()), &[(&output, dtype.size())]);
 
-    let working_units = output.shape.iter().product::<usize>() / vector_size as usize;
-    let cube_dim = CubeDim::new(client, working_units);
-    let cube_count = calculate_cube_count_elemwise(client, working_units, cube_dim);
-
-    let address_type = input
-        .required_address_type(dtype.size())
-        .max(output.required_address_type(dtype.size()));
-
-    pool2d_direct::launch::<MaxPoolStrategy, R>(
+    pool::launch::<MaxPoolStrategy, R>(
         client,
-        cube_count,
-        cube_dim,
+        launch.cube_count,
+        launch.cube_dim,
         address_type,
-        vector_size,
+        launch.vector_size,
         input.into_tensor_arg(),
-        view4d(output.clone(), vector_size),
+        view4d(output.clone(), launch.vector_size),
         (),
         shape_divmod(&output),
-        working_units,
+        launch.working_units,
         Pool2dDirectArgsLaunch::new(
             options.window.stride[0] as u32,
             options.window.stride[1] as u32,
@@ -167,33 +152,23 @@ pub(crate) fn max_pool2d_with_indices_launch<R: Runtime>(
     options: MaxPoolOptions<2>,
     dtype: StorageType,
 ) -> Result<(), PoolError> {
-    let vector_size = tensor_vector_size_parallel(
-        client.io_optimized_vector_sizes(dtype.size()),
-        &input.shape,
-        &input.strides,
-        input.shape.len() - 1,
+    let launch = launch_config_for(client, dtype, &input, &output);
+    let address_type = address_type_for(
+        (&input, dtype.size()),
+        &[(&output, dtype.size()), (&indices, dtype.size())],
     );
 
-    let working_units = output.shape.iter().product::<usize>() / vector_size as usize;
-    let cube_dim = CubeDim::new(client, working_units);
-    let cube_count = calculate_cube_count_elemwise(client, working_units, cube_dim);
-
-    let address_type = input
-        .required_address_type(dtype.size())
-        .max(output.required_address_type(dtype.size()))
-        .max(indices.required_address_type(dtype.size()));
-
-    pool2d_direct::launch::<MaxPoolWithIndicesStrategy, R>(
+    pool::launch::<MaxPoolWithIndicesStrategy, R>(
         client,
-        cube_count,
-        cube_dim,
+        launch.cube_count,
+        launch.cube_dim,
         address_type,
-        vector_size,
+        launch.vector_size,
         input.into_tensor_arg(),
-        view4d(output.clone(), vector_size),
-        view4d(indices.clone(), vector_size),
+        view4d(output.clone(), launch.vector_size),
+        view4d(indices.clone(), launch.vector_size),
         shape_divmod(&output),
-        working_units,
+        launch.working_units,
         Pool2dDirectArgsLaunch::new(
             options.window.stride[0] as u32,
             options.window.stride[1] as u32,

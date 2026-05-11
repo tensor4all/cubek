@@ -10,14 +10,8 @@ mod kernel;
 
 use crate::definition::{PoolError, PoolMode};
 use crate::kernel::{
-    backward::{
-        adaptive_avg_pool2d_backward_launch, avg_pool2d_backward_launch,
-        max_pool2d_with_indices_backward_launch,
-    },
-    forward::{
-        adaptive_avg_pool2d_launch, avg_pool2d_launch, max_pool2d_launch,
-        max_pool2d_with_indices_launch,
-    },
+    backward::{pool2d_backward_launch_mode, pool2d_with_indices_backward_launch_mode},
+    forward::{pool2d_launch_mode, pool2d_with_indices_launch_mode},
 };
 
 /// Pool2d public wrapper
@@ -33,13 +27,7 @@ pub fn pool2d<R: Runtime>(
     validate_rank(input.shape.len(), output.shape.len())?;
     validate_nhwc_consistency(&input.shape, &output.shape)?;
 
-    match mode {
-        PoolMode::Max(max_options) => max_pool2d_launch(client, input, output, max_options, dtype),
-        PoolMode::Avg(avg_options) => avg_pool2d_launch(client, input, output, avg_options, dtype),
-        PoolMode::AdaptiveAvg(adaptive_avg_options) => {
-            adaptive_avg_pool2d_launch(client, input, output, adaptive_avg_options, dtype)
-        }
-    }
+    pool2d_launch_mode(client, input, output, mode, dtype)
 }
 
 /// Pool2d with indices public wrapper
@@ -58,14 +46,7 @@ pub fn pool2d_with_indices<R: Runtime>(
     validate_nhwc_consistency(&input.shape, &output.shape)?;
     validate_nhwc_consistency(&input.shape, &indices.shape)?;
 
-    match mode {
-        PoolMode::Max(max_options) => {
-            max_pool2d_with_indices_launch(client, input, output, indices, max_options, dtype)
-        }
-        _ => Err(PoolError::UnsupportedMode {
-            mode: format!("{0:?}", mode),
-        }),
-    }
+    pool2d_with_indices_launch_mode(client, input, output, indices, mode, dtype)
 }
 
 /// Pool2d backward public wrapper
@@ -84,22 +65,7 @@ pub fn pool2d_backward<R: Runtime>(
     validate_nhwc_consistency(&input.shape, &out_grad.shape)?;
     validate_nhwc_consistency(&input.shape, &in_grad.shape)?;
 
-    match mode {
-        PoolMode::Avg(avg_options) => {
-            avg_pool2d_backward_launch(client, input, out_grad, in_grad, avg_options, dtype)
-        }
-        PoolMode::AdaptiveAvg(adaptive_avg_options) => adaptive_avg_pool2d_backward_launch(
-            client,
-            input,
-            out_grad,
-            in_grad,
-            adaptive_avg_options,
-            dtype,
-        ),
-        _ => Err(PoolError::UnsupportedMode {
-            mode: format!("{0:?}", mode),
-        }),
-    }
+    pool2d_backward_launch_mode(client, input, out_grad, in_grad, mode, dtype)
 }
 
 /// Pool2d backward with indices public wrapper
@@ -123,21 +89,16 @@ pub fn pool2d_with_indices_backward<R: Runtime>(
     validate_nhwc_consistency(&input.shape, &in_grad.shape)?;
     validate_nhwc_consistency(&input.shape, &indices.shape)?;
 
-    match mode {
-        PoolMode::Max(max_options) => max_pool2d_with_indices_backward_launch(
-            client,
-            input,
-            out_grad,
-            indices,
-            in_grad,
-            max_options,
-            dtype,
-            indices_dtype,
-        ),
-        _ => Err(PoolError::UnsupportedMode {
-            mode: format!("{0:?}", mode),
-        }),
-    }
+    pool2d_with_indices_backward_launch_mode(
+        client,
+        input,
+        out_grad,
+        indices,
+        in_grad,
+        mode,
+        dtype,
+        indices_dtype,
+    )
 }
 
 /// Check that both tensors are 4D (Batch, Height, Width, Channels).
