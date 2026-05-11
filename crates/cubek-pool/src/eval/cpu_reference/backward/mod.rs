@@ -7,8 +7,8 @@ pub use avg_pool::run_avg_pool_backward;
 pub use max_pool::run_max_pool_backward;
 
 use super::{f32_storage_type, i32_storage_type, make_random_f32_host, make_zero_handle};
-use crate::cpu_reference::{cpu_reference_max_pool_indices, cpu_reference_pool_backward};
 use crate::definition::{PoolBackwardProblem, PoolMode};
+use crate::eval::cpu_reference::{cpu_reference_max_pool_indices, cpu_reference_pool_backward};
 use crate::{pool2d_backward, pool2d_with_indices, pool2d_with_indices_backward};
 use cubecl::{
     TestRuntime,
@@ -24,7 +24,7 @@ pub fn strategy_result(
     problem: PoolBackwardProblem<2>,
     seed: u64,
 ) -> Result<HostData, String> {
-    if matches!(problem.mode, PoolMode::Max(_)) && !problem.with_indices {
+    if matches!(&problem.mode, PoolMode::Max(_)) && !problem.with_indices {
         return Err("max pool backward requires indices".to_string());
     }
 
@@ -109,7 +109,7 @@ pub fn cpu_reference_result(
     seed: u64,
     progress: Option<&Progress>,
 ) -> Result<HostData, String> {
-    if matches!(problem.mode, PoolMode::Max(_)) && !problem.with_indices {
+    if matches!(&problem.mode, PoolMode::Max(_)) && !problem.with_indices {
         return Err("max pool backward requires indices".to_string());
     }
 

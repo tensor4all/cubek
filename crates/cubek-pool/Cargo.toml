@@ -19,9 +19,6 @@ extended = ["heavy"]
 full = ["extended"]
 
 cpu-reference = ["dep:cubek-test-utils"]
-# Enables `pub mod benchmarks` — catalogue of interpolate benchmark problems
-# and the bench harness. The seeded `InterpolateCorrectness` impl inside
-# that module is additionally gated on `cpu-reference`.
 benchmarks = ["cpu-reference", "cubecl/test-runtime"]
 
 [dependencies]

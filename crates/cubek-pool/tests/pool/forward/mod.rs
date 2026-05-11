@@ -8,8 +8,10 @@ use super::{
 };
 use cubecl::{TestRuntime, client::ComputeClient, zspace::Shape};
 use cubek_pool::{
-    cpu_reference::{cpu_reference_max_pool_indices, cpu_reference_pool, geometry::PoolGeometry},
     definition::{PoolForwardProblem, PoolMode},
+    eval::cpu_reference::{
+        cpu_reference_max_pool_indices, cpu_reference_pool, geometry::PoolGeometry,
+    },
     pool2d, pool2d_with_indices,
 };
 use cubek_test_utils::TestInput;

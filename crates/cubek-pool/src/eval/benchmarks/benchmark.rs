@@ -9,13 +9,13 @@ use cubecl::{
 };
 use cubek_test_utils::{RunSamples, TestInput};
 
-use crate::definition::PoolProblem;
+use crate::definition::{PoolBackward, PoolForward, PoolProblem};
 use crate::eval::benchmarks::strategy::PoolStrategy;
 use crate::{pool2d, pool2d_backward, pool2d_with_indices, pool2d_with_indices_backward};
 
 pub fn bench(
     _strategy: &PoolStrategy,
-    problem: &PoolProblem<2>,
+    problem: &PoolProblem,
     num_samples: usize,
 ) -> Result<RunSamples, String> {
     let device = <TestRuntime as Runtime>::Device::default();
@@ -40,7 +40,7 @@ pub fn bench(
 }
 
 struct PoolBench {
-    problem: PoolProblem<2>,
+    problem: PoolProblem,
     device: <TestRuntime as Runtime>::Device,
     client: ComputeClient<TestRuntime>,
     dtype: StorageType,
@@ -64,14 +64,14 @@ impl Benchmark for PoolBench {
 
     fn prepare(&self) -> Self::Input {
         match &self.problem {
-            PoolProblem::Forward(prob) => {
+            PoolProblem::Forward(PoolForward::D2(prob)) => {
                 let input = TestInput::builder(self.client.clone(), prob.input_shape.clone())
                     .dtype(self.dtype)
                     .uniform(0, -1., 1.)
                     .generate_without_host_data();
                 PoolBenchInput::Forward(input)
             }
-            PoolProblem::Backward(prob) => {
+            PoolProblem::Backward(PoolBackward::D2(prob)) => {
                 let n = prob.out_grad_shape[0];
                 let c = prob.out_grad_shape[3];
                 let input_shape = Shape::from(vec![n, prob.input_size[0], prob.input_size[1], c]);
@@ -117,12 +117,13 @@ impl Benchmark for PoolBench {
                     indices,
                 }
             }
+            _ => panic!("benchmarks only support 2d pool problems"),
         }
     }
 
     fn execute(&self, input: Self::Input) -> Result<TensorHandle<TestRuntime>, String> {
         match (&self.problem, input) {
-            (PoolProblem::Forward(prob), PoolBenchInput::Forward(input)) => {
+            (PoolProblem::Forward(PoolForward::D2(prob)), PoolBenchInput::Forward(input)) => {
                 let output_shape = &input.shape();
                 let output = TensorHandle::empty(&self.client, output_shape.to_vec(), self.dtype);
 
@@ -155,7 +156,7 @@ impl Benchmark for PoolBench {
                 Ok(output)
             }
             (
-                PoolProblem::Backward(prob),
+                PoolProblem::Backward(PoolBackward::D2(prob)),
                 PoolBenchInput::Backward {
                     input,
                     out_grad,
@@ -193,7 +194,7 @@ impl Benchmark for PoolBench {
 
                 Ok(output)
             }
-            _ => Err("benchmark input does not match pool problem".to_string()),
+            _ => Err("benchmarks only support 2d pool problems".to_string()),
         }
     }
 
@@ -203,16 +204,17 @@ impl Benchmark for PoolBench {
 
     fn name(&self) -> String {
         match &self.problem {
-            PoolProblem::Forward(prob) => format!(
+            PoolProblem::Forward(PoolForward::D2(prob)) => format!(
                 "pool-{:?}-{:?}-{:?}-{:?}-indices-{:?}",
                 self.dtype, prob.mode, self.device, prob.input_shape, prob.with_indices,
             )
             .to_lowercase(),
-            PoolProblem::Backward(prob) => format!(
+            PoolProblem::Backward(PoolBackward::D2(prob)) => format!(
                 "pool-backward-{:?}-{:?}-{:?}-{:?}-indices-{:?}",
                 self.dtype, prob.mode, self.device, prob.out_grad_shape, prob.with_indices,
             )
             .to_lowercase(),
+            _ => panic!("benchmarks only support 2d pool problems"),
         }
     }
 

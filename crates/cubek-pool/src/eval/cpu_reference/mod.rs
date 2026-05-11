@@ -3,7 +3,11 @@ mod forward;
 pub mod geometry;
 
 use crate::{
-    cpu_reference::{
+    definition::{
+        MaxPoolOptions, PoolBackward, PoolBackwardProblem, PoolForward, PoolForwardProblem,
+        PoolMode, PoolProblem,
+    },
+    eval::cpu_reference::{
         backward::{run_adaptive_avg_pool_backward, run_avg_pool_backward, run_max_pool_backward},
         forward::{
             row_major_strides_vec, run_adaptive_avg_pool, run_avg_pool, run_max_pool,
@@ -11,7 +15,6 @@ use crate::{
         },
         geometry::PoolGeometry,
     },
-    definition::{MaxPoolOptions, PoolBackwardProblem, PoolForwardProblem, PoolMode, PoolProblem},
 };
 use cubecl::{
     TestRuntime,
@@ -52,30 +55,36 @@ pub(crate) fn make_zero_handle(
         .generate()
 }
 
-pub(crate) fn output_shape_for(mode: &PoolMode<2>, input_shape: &Shape) -> Shape {
-    mode.output_shape(input_shape)
-}
-
 pub fn strategy_result(
     client: ComputeClient<TestRuntime>,
-    problem: PoolProblem<2>,
+    problem: PoolProblem,
     seed: u64,
 ) -> Result<HostData, String> {
     match problem {
-        PoolProblem::Forward(prob) => forward::strategy_result(client, prob, seed),
-        PoolProblem::Backward(prob) => backward::strategy_result(client, prob, seed),
+        PoolProblem::Forward(PoolForward::D2(prob)) => forward::strategy_result(client, prob, seed),
+        PoolProblem::Forward(_) => Err("cpu reference only supports 2d pool forward".to_string()),
+        PoolProblem::Backward(PoolBackward::D2(prob)) => {
+            backward::strategy_result(client, prob, seed)
+        }
+        PoolProblem::Backward(_) => Err("cpu reference only supports 2d pool backward".to_string()),
     }
 }
 
 pub fn cpu_reference_result(
     client: ComputeClient<TestRuntime>,
-    problem: PoolProblem<2>,
+    problem: PoolProblem,
     seed: u64,
     progress: Option<&Progress>,
 ) -> Result<HostData, String> {
     match problem {
-        PoolProblem::Forward(prob) => forward::cpu_reference_result(client, prob, seed, progress),
-        PoolProblem::Backward(prob) => backward::cpu_reference_result(client, prob, seed, progress),
+        PoolProblem::Forward(PoolForward::D2(prob)) => {
+            forward::cpu_reference_result(client, prob, seed, progress)
+        }
+        PoolProblem::Forward(_) => Err("cpu reference only supports 2d pool forward".to_string()),
+        PoolProblem::Backward(PoolBackward::D2(prob)) => {
+            backward::cpu_reference_result(client, prob, seed, progress)
+        }
+        PoolProblem::Backward(_) => Err("cpu reference only supports 2d pool backward".to_string()),
     }
 }
 

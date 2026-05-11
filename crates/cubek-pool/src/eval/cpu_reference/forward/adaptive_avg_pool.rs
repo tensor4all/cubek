@@ -1,6 +1,6 @@
 use crate::{
-    cpu_reference::{decode_index, forward::decode_index_simple},
     definition::AdaptiveAvgPoolOptions,
+    eval::cpu_reference::{decode_index, forward::decode_index_simple},
 };
 use cubek_test_utils::HostData;
 

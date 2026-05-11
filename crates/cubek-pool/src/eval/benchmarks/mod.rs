@@ -16,7 +16,7 @@ use crate::definition::PoolProblem;
 pub struct Category;
 
 impl cubek_test_utils::Category for Category {
-    type Problem = PoolProblem<2>;
+    type Problem = PoolProblem;
     type Strategy = PoolStrategy;
 
     fn id(&self) -> &'static str {
@@ -27,7 +27,7 @@ impl cubek_test_utils::Category for Category {
         "Pool"
     }
 
-    fn problems(&self) -> Vec<CatalogEntry<PoolProblem<2>>> {
+    fn problems(&self) -> Vec<CatalogEntry<PoolProblem>> {
         problems()
     }
 
@@ -38,14 +38,14 @@ impl cubek_test_utils::Category for Category {
     fn bench(
         &self,
         strategy: &PoolStrategy,
-        problem: &PoolProblem<2>,
+        problem: &PoolProblem,
         num_samples: usize,
     ) -> Result<RunSamples, String> {
         bench(strategy, problem, num_samples)
     }
     fn correctness(
         &self,
-    ) -> Option<&dyn cubek_test_utils::Correctness<Problem = PoolProblem<2>, Strategy = PoolStrategy>>
+    ) -> Option<&dyn cubek_test_utils::Correctness<Problem = PoolProblem, Strategy = PoolStrategy>>
     {
         Some(&PoolCorrectness)
     }

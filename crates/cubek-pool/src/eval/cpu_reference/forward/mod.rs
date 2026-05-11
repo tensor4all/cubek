@@ -6,11 +6,9 @@ pub use adaptive_avg_pool::run_adaptive_avg_pool;
 pub use avg_pool::run_avg_pool;
 pub use max_pool::{run_max_pool, run_max_pool_with_indices};
 
-use super::{
-    f32_storage_type, i32_storage_type, make_random_f32_host, make_zero_handle, output_shape_for,
-};
-use crate::cpu_reference::decode_index;
-use crate::definition::PoolForwardProblem;
+use super::{f32_storage_type, i32_storage_type, make_random_f32_host, make_zero_handle};
+use crate::definition::{PoolForwardProblem, PoolMode};
+use crate::eval::cpu_reference::{cpu_reference_pool, decode_index, geometry::PoolGeometry};
 use crate::{pool2d, pool2d_with_indices};
 use cubecl::{TestRuntime, client::ComputeClient};
 use cubek_test_utils::{
@@ -60,16 +58,18 @@ pub fn strategy_result(
     let (input_handle, _input_host) =
         make_random_f32_host(&client, problem.input_shape.to_vec(), seed);
 
-    let output_shape = output_shape_for(&problem.mode, &problem.input_shape);
+    let output_shape = problem.output_shape(&problem.input_shape);
     let output_handle = make_zero_handle(&client, output_shape.to_vec(), dtype);
 
     let outcome = launch_and_capture_outcome(&client, |c| {
         if problem.with_indices {
-            let indices_handle = make_zero_handle(
-                &client,
-                output_shape.to_vec(),
-                i32_storage_type(),
-            );
+            if !matches!(&problem.mode, PoolMode::Max(_)) {
+                return Err("pool indices only supported for max".to_string()).into();
+            }
+
+            let indices_handle =
+                make_zero_handle(&client, output_shape.to_vec(), i32_storage_type());
+
             pool2d_with_indices::<TestRuntime>(
                 c,
                 input_handle.clone().binding(),
@@ -107,7 +107,7 @@ pub fn cpu_reference_result(
     seed: u64,
     progress: Option<&Progress>,
 ) -> Result<HostData, String> {
-    let output_shape = output_shape_for(&problem.mode, &problem.input_shape);
+    let output_shape = problem.output_shape(&problem.input_shape);
 
     if let Some(p) = progress {
         let total: usize = output_shape.iter().product();
@@ -117,5 +117,5 @@ pub fn cpu_reference_result(
     let (_input_handle, input_host) =
         make_random_f32_host(&client, problem.input_shape.to_vec(), seed);
 
-    Ok(crate::cpu_reference::cpu_reference_pool(&input_host, problem))
+    Ok(cpu_reference_pool(&input_host, problem))
 }

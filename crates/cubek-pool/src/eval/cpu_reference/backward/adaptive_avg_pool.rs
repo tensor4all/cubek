@@ -1,4 +1,4 @@
-use crate::{cpu_reference::decode_index, definition::AdaptiveAvgPoolOptions};
+use crate::{definition::AdaptiveAvgPoolOptions, eval::cpu_reference::decode_index};
 use cubek_test_utils::HostData;
 
 pub fn run_adaptive_avg_pool_backward<const N: usize>(
