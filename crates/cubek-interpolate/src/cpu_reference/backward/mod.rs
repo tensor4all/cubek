@@ -32,7 +32,7 @@ pub fn strategy_result(
         make_random_f32_host(&client, out_grad_shape.clone(), seed);
 
     let input_grad_shape = input_shape;
-    let input_grad_handle = make_zero_handle(&client, input_grad_shape, dtype.clone());
+    let input_grad_handle = make_zero_handle(&client, input_grad_shape, dtype);
 
     let outcome = launch_and_capture_outcome(&client, |c| {
         interpolate_backward(
@@ -41,7 +41,7 @@ pub fn strategy_result(
             out_grad_handle.clone().binding(),
             input_grad_handle.clone().binding(),
             problem.options.clone(),
-            dtype.clone(),
+            dtype,
         )
         .into()
     });
