@@ -52,8 +52,8 @@ impl Benchmark for InterpolateBench {
 
     fn prepare(&self) -> Self::Input {
         let shape = match &self.problem {
-            InterpolateProblem::InterpolateForward(prob) => Shape::new(prob.input_shape),
-            InterpolateProblem::InterpolateBackward(prob) => Shape::new(prob.out_grad_shape),
+            InterpolateProblem::Forward(prob) => Shape::new(prob.input_shape),
+            InterpolateProblem::Backward(prob) => Shape::new(prob.out_grad_shape),
         };
         TestInput::builder(self.client.clone(), shape)
             .dtype(self.dtype)
@@ -63,7 +63,7 @@ impl Benchmark for InterpolateBench {
 
     fn execute(&self, input: Self::Input) -> Result<TensorHandle<TestRuntime>, String> {
         match &self.problem {
-            InterpolateProblem::InterpolateForward(prob) => {
+            InterpolateProblem::Forward(prob) => {
                 let [n, _, _, c] = prob.input_shape;
                 let output_shape = vec![n, prob.output_size[0], prob.output_size[1], c];
                 let output = TensorHandle::empty(&self.client, output_shape, self.dtype);
@@ -79,7 +79,7 @@ impl Benchmark for InterpolateBench {
 
                 Ok(output)
             }
-            InterpolateProblem::InterpolateBackward(prob) => {
+            InterpolateProblem::Backward(prob) => {
                 let [n, _, _, c] = prob.out_grad_shape;
                 let input_grad_shape = vec![n, prob.input_size[0], prob.input_size[1], c];
 
@@ -114,12 +114,12 @@ impl Benchmark for InterpolateBench {
 
     fn name(&self) -> String {
         match &self.problem {
-            InterpolateProblem::InterpolateForward(prob) => format!(
+            InterpolateProblem::Forward(prob) => format!(
                 "interpolate-{:?}-{:?}-{:?}-{:?}",
                 self.dtype, prob.options.mode, self.device, prob.input_shape,
             )
             .to_lowercase(),
-            InterpolateProblem::InterpolateBackward(prob) => format!(
+            InterpolateProblem::Backward(prob) => format!(
                 "interpolate-backward-{:?}-{:?}-{:?}-{:?}",
                 self.dtype, prob.options.mode, self.device, prob.out_grad_shape,
             )
