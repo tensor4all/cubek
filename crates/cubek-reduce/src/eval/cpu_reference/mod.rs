@@ -81,7 +81,7 @@ pub fn strategy_result(
             axis,
             strategy.clone(),
             config,
-            dtypes.clone(),
+            dtypes,
         )
         .into()
     });
