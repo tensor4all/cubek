@@ -24,7 +24,6 @@ pub use bounce::*;
 pub use instruction::*;
 pub use kind::*;
 pub use row_wise::*;
-#[allow(unused_imports)] // populated in PR 2
 pub use stage::*;
 pub use strided::*;
 pub use unit::*;

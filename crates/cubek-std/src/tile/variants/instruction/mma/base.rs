@@ -275,7 +275,9 @@ impl<N: Numeric> MmaTile<N> {
             | TileKind::Interleaved(_)
             | TileKind::Unit(_)
             | TileKind::WhiteboxFragment(_)
-            | TileKind::Bounce(_) => panic!("MmaTile::copy_from: unsupported source variant"),
+            | TileKind::Bounce(_)
+            | TileKind::Stage(_)
+            | TileKind::Partition(_) => panic!("MmaTile::copy_from: unsupported source variant"),
         }
     }
 
