@@ -1,9 +1,6 @@
 use super::{
     super::{address_type_for, launch_config_for, shape_divmod},
-    pool2d::{
-        Pool2dDirectArgsLaunch, Pool2dDirectStrategy, Pool2dDirectStrategyFamily, Position, pool2d,
-        view4d,
-    },
+    pool2d::{Pool2dArgsLaunch, Pool2dStrategy, Pool2dStrategyFamily, Position, pool2d, view4d},
 };
 use crate::definition::{MaxPoolOptions, PoolError};
 use cubecl::{Runtime, num_traits::Zero, prelude::TensorBinding, prelude::*, std::tensor::View};
@@ -11,20 +8,20 @@ use cubecl::{Runtime, num_traits::Zero, prelude::TensorBinding, prelude::*, std:
 struct MaxPoolStrategy;
 struct MaxPoolWithIndicesStrategy;
 
-impl Pool2dDirectStrategyFamily for MaxPoolStrategy {
+impl Pool2dStrategyFamily for MaxPoolStrategy {
     type Indices<N: Size> = ();
     type Config = ();
     type Pool2d<T: Numeric, N: Size> = Self;
 }
 
-impl Pool2dDirectStrategyFamily for MaxPoolWithIndicesStrategy {
+impl Pool2dStrategyFamily for MaxPoolWithIndicesStrategy {
     type Indices<N: Size> = View<Vector<i32, N>, Position, ReadWrite>;
     type Config = ();
     type Pool2d<T: Numeric, N: Size> = Self;
 }
 
 #[cube]
-impl<T: Numeric, N: Size> Pool2dDirectStrategy<T, N> for MaxPoolStrategy {
+impl<T: Numeric, N: Size> Pool2dStrategy<T, N> for MaxPoolStrategy {
     type Accumulator = Vector<T, N>;
     type Config = ();
     type Indices = ();
@@ -62,7 +59,7 @@ impl<T: Numeric, N: Size> Pool2dDirectStrategy<T, N> for MaxPoolStrategy {
 }
 
 #[cube]
-impl<T: Numeric, N: Size> Pool2dDirectStrategy<T, N> for MaxPoolWithIndicesStrategy {
+impl<T: Numeric, N: Size> Pool2dStrategy<T, N> for MaxPoolWithIndicesStrategy {
     type Accumulator = (Vector<T, N>, Vector<i32, N>);
     type Config = ();
     type Indices = View<Vector<i32, N>, Position, ReadWrite>;
@@ -125,7 +122,7 @@ pub(crate) fn max_pool2d_launch<R: Runtime>(
         (),
         shape_divmod(&output),
         launch.working_units,
-        Pool2dDirectArgsLaunch::new(
+        Pool2dArgsLaunch::new(
             options.window.stride[0] as u32,
             options.window.stride[1] as u32,
             options.dilation[0] as u32,
@@ -169,7 +166,7 @@ pub(crate) fn max_pool2d_with_indices_launch<R: Runtime>(
         view4d(indices.clone(), launch.vector_size),
         shape_divmod(&output),
         launch.working_units,
-        Pool2dDirectArgsLaunch::new(
+        Pool2dArgsLaunch::new(
             options.window.stride[0] as u32,
             options.window.stride[1] as u32,
             options.dilation[0] as u32,

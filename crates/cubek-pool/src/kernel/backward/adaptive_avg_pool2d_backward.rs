@@ -4,12 +4,15 @@ use super::super::{
 use crate::definition::{AdaptiveAvgPoolOptions, PoolError};
 use crate::kernel::forward::{Position, view4d};
 use cubecl::{
-    Runtime, num_traits::Zero, prelude::TensorBinding, prelude::*,
+    Runtime,
+    num_traits::Zero,
+    prelude::TensorBinding,
+    prelude::*,
     std::{FastDivmod, tensor::View},
 };
 
 #[cube(launch, address_type = "dynamic")]
-fn adaptive_avg_pool2d_backward_direct<E: Numeric, N: Size>(
+fn adaptive_avg_pool2d_backward<E: Numeric, N: Size>(
     grad: &Tensor<Vector<E, N>>,
     output: &mut View<Vector<E, N>, Position, ReadWrite>,
     out_shape: Sequence<FastDivmod<usize>>,
@@ -19,6 +22,8 @@ fn adaptive_avg_pool2d_backward_direct<E: Numeric, N: Size>(
     if ABSOLUTE_POS >= working_units {
         terminate!();
     }
+
+    let vector_size = grad.vector_size();
 
     let (_, out_h, out_w, _) = output.shape();
     let (grad_stride_h, grad_stride_w) = (grad.stride(1), grad.stride(2));
@@ -50,8 +55,7 @@ fn adaptive_avg_pool2d_backward_direct<E: Numeric, N: Size>(
                     let num_iw = iw_end - iw_start;
 
                     let index = index_base + (oh * grad_stride_h) + (ow * grad_stride_w);
-                    grad_acc +=
-                        grad[index / grad.vector_size()] / Vector::cast_from(num_iw * num_ih);
+                    grad_acc += grad[index / vector_size] / Vector::cast_from(num_iw * num_ih);
                 }
             }
         }
@@ -71,7 +75,7 @@ pub(crate) fn adaptive_avg_pool2d_backward_launch<R: Runtime>(
     let launch = launch_config_for(client, dtype, &input, &output);
     let address_type = address_type_for((&input, dtype.size()), &[(&output, dtype.size())]);
 
-    adaptive_avg_pool2d_backward_direct::launch(
+    adaptive_avg_pool2d_backward::launch(
         client,
         launch.cube_count,
         launch.cube_dim,

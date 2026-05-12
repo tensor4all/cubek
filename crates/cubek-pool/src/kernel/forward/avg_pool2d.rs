@@ -1,16 +1,13 @@
 use super::{
     super::{address_type_for, launch_config_for, shape_divmod},
-    pool2d::{
-        Pool2dDirectArgsLaunch, Pool2dDirectStrategy, Pool2dDirectStrategyFamily, Position, pool2d,
-        view4d,
-    },
+    pool2d::{Pool2dArgsLaunch, Pool2dStrategy, Pool2dStrategyFamily, Position, pool2d, view4d},
 };
 use crate::definition::{AvgPoolOptions, PoolError};
 use cubecl::{Runtime, num_traits::Zero, prelude::TensorBinding, prelude::*, std::tensor::View};
 
 struct AvgPoolStrategy;
 
-impl Pool2dDirectStrategyFamily for AvgPoolStrategy {
+impl Pool2dStrategyFamily for AvgPoolStrategy {
     type Indices<N: Size> = ();
     type Config = AvgPoolStrategyConfig;
     type Pool2d<T: Numeric, N: Size> = Self;
@@ -26,7 +23,7 @@ pub struct AvgPoolStrategyConfig {
 }
 
 #[cube]
-impl<T: Numeric, N: Size> Pool2dDirectStrategy<T, N> for AvgPoolStrategy {
+impl<T: Numeric, N: Size> Pool2dStrategy<T, N> for AvgPoolStrategy {
     type Accumulator = (Vector<T, N>, u32);
     type Config = AvgPoolStrategyConfig;
     type Indices = ();
@@ -109,7 +106,7 @@ pub(crate) fn avg_pool2d_launch<R: Runtime>(
         (),
         shape_divmod(&output),
         launch.working_units,
-        Pool2dDirectArgsLaunch::new(
+        Pool2dArgsLaunch::new(
             options.window.stride[0] as u32,
             options.window.stride[1] as u32,
             dilation as u32,

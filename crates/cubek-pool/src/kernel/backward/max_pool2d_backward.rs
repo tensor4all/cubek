@@ -6,9 +6,7 @@ use crate::{
     definition::{MaxPoolOptions, PoolError},
     kernel::backward::{PoolBackwardArgs, PoolBackwardArgsLaunch},
 };
-use cubecl::{
-    Runtime, num_traits::Zero, prelude::TensorBinding, prelude::*, std::FastDivmod,
-};
+use cubecl::{Runtime, num_traits::Zero, prelude::TensorBinding, prelude::*, std::FastDivmod};
 
 #[cube(launch_unchecked, address_type = "dynamic")]
 fn max_pool2d_with_indices_backward_kernel<E: Numeric, I: Int, N: Size>(

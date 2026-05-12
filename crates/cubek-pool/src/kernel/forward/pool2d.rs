@@ -14,16 +14,16 @@ use cubecl::{
     },
 };
 
-pub trait Pool2dDirectStrategyFamily: Send + Sync + 'static {
+pub trait Pool2dStrategyFamily: Send + Sync + 'static {
     type Indices<N: Size>: LaunchArg;
     type Config: CubeType + Clone + Send + Sync + core::fmt::Debug + Hash + core::cmp::Eq;
-    type Pool2d<T: Numeric, N: Size>: Pool2dDirectStrategy<T, N, Config = Self::Config, Indices = Self::Indices<N>>;
+    type Pool2d<T: Numeric, N: Size>: Pool2dStrategy<T, N, Config = Self::Config, Indices = Self::Indices<N>>;
 }
 
 pub(crate) type Position = (usize, usize, usize, usize);
 
 #[cube]
-pub(crate) trait Pool2dDirectStrategy<T: Numeric, N: Size>: Send + Sync + 'static {
+pub(crate) trait Pool2dStrategy<T: Numeric, N: Size>: Send + Sync + 'static {
     type Accumulator: CubeType;
     type Config: CubeType + Clone + Send + Sync + core::fmt::Debug + Hash + core::cmp::Eq;
 
@@ -58,7 +58,7 @@ pub(crate) trait Pool2dDirectStrategy<T: Numeric, N: Size>: Send + Sync + 'stati
 }
 
 #[derive(CubeLaunch, CubeType)]
-pub struct Pool2dDirectArgs {
+pub struct Pool2dArgs {
     pub strides_0: u32,
     pub strides_1: u32,
     pub dilation_0: u32,
@@ -68,13 +68,13 @@ pub struct Pool2dDirectArgs {
 }
 
 #[cube(launch, address_type = "dynamic")]
-pub fn pool2d<E: Numeric, N: Size, S: Pool2dDirectStrategyFamily>(
+pub fn pool2d<E: Numeric, N: Size, S: Pool2dStrategyFamily>(
     input: &Tensor<Vector<E, N>>,
     output: &mut View<Vector<E, N>, Position, ReadWrite>,
     indices: &mut S::Indices<N>,
     out_shape: Sequence<FastDivmod<usize>>,
     working_units: usize,
-    args: &Pool2dDirectArgs,
+    args: &Pool2dArgs,
     #[comptime] kernel_size: (u32, u32),
     #[comptime] config: &S::Config,
     #[define(E)] _dtype: StorageType,

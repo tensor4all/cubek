@@ -14,7 +14,7 @@ use cubecl::{
 };
 
 #[cube(launch, address_type = "dynamic")]
-fn adaptive_avg_pool2d_direct<E: Numeric, N: Size>(
+fn adaptive_avg_pool2d<E: Numeric, N: Size>(
     input: &Tensor<Vector<E, N>>,
     output: &mut View<Vector<E, N>, Position, ReadWrite>,
     out_shape: Sequence<FastDivmod<usize>>,
@@ -68,7 +68,7 @@ pub(crate) fn adaptive_avg_pool2d_launch<R: Runtime>(
     let launch = launch_config_for(client, dtype, &input, &output);
     let address_type = address_type_for((&input, dtype.size()), &[(&output, dtype.size())]);
 
-    adaptive_avg_pool2d_direct::launch(
+    adaptive_avg_pool2d::launch(
         client,
         launch.cube_count,
         launch.cube_dim,

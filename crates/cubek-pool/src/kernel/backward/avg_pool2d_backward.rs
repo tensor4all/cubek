@@ -7,7 +7,10 @@ use super::{
 use crate::definition::{AvgPoolOptions, PoolError};
 use crate::kernel::forward::{Position, view4d};
 use cubecl::{
-    Runtime, num_traits::Zero, prelude::TensorBinding, prelude::*,
+    Runtime,
+    num_traits::Zero,
+    prelude::TensorBinding,
+    prelude::*,
     std::{FastDivmod, tensor::View},
 };
 
