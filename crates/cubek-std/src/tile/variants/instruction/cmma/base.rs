@@ -9,7 +9,7 @@ use crate::{
     tile::{
         Tile, TileKind, TileKindExpand, TileScope,
         variants::{
-            cmma::{CmmaFragmentReader as _, CmmaStageReader, CmmaStageWriter},
+            instruction::cmma::{CmmaFragmentReader as _, CmmaStageReader, CmmaStageWriter},
             kind::Strided,
             strided::SharedTile,
         },

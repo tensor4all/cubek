@@ -10,8 +10,8 @@ use crate::{
     tile::{
         Tile, TileKind, TileKindExpand, TileScope,
         variants::{
+            instruction::mma::{MmaFragmentReader as _, MmaStageReader, MmaStageWriter},
             kind::{Filled, Strided},
-            mma::{MmaFragmentReader as _, MmaStageReader, MmaStageWriter},
             strided::SharedTile,
         },
     },
