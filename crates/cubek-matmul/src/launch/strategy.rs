@@ -14,7 +14,7 @@ use crate::{
         tile::TileMatmulKind,
     },
     definition::{MatmulElems, MatmulSetupError},
-    launch::{launch_gemm, launch_gemv_unit_perpendicular, launch_naive, launch_tiling},
+    launch::{launch_gemm, launch_gemv_unit_perpendicular, launch_mosaic, launch_naive, launch_tiling},
     routines::{
         BlueprintStrategy, Routine,
         double_buffering::{
@@ -26,6 +26,7 @@ use crate::{
         gemm::GemmRoutine,
         gemv_innerproduct::{DoubleVecMatInnerProductAlgorithm, VecMatInnerProductAlgorithm},
         gemv_unit_perpendicular::GemvUnitPerpendicularRoutine,
+        mosaic::MosaicRoutine,
         ordered_double_buffering::{OrderedDoubleBufferingAlgorithm, OrderedSelectionArgs},
         simple::{SimpleAlgorithm, SimpleArgs, SimpleTmaAlgorithm},
         simple_unit::SimpleUnitAlgorithm,
@@ -178,6 +179,7 @@ pub enum Strategy {
     DoubleVecMat(BlueprintStrategy<(), DoubleVecMatInnerProductAlgorithm>),
     GemvUnitPerpendicular(BlueprintStrategy<(), GemvUnitPerpendicularRoutine>),
     Gemm(BlueprintStrategy<(), GemmRoutine>),
+    Mosaic(BlueprintStrategy<(), MosaicRoutine>),
     Naive,
     #[default]
     Auto,
@@ -234,6 +236,7 @@ impl Display for Strategy {
             Strategy::Auto => f.write_str("matmul_auto"),
             Strategy::GemvUnitPerpendicular(s) => write!(f, "vecmat_unit_perpendicular{}", s),
             Strategy::Gemm(s) => write!(f, "gemm{}", s),
+            Strategy::Mosaic(s) => write!(f, "mosaic{}", s),
         }
     }
 }
@@ -532,6 +535,9 @@ impl Strategy {
             }
             Strategy::Gemm(blueprint_strategy) => {
                 launch_gemm::launch_ref(client, lhs, rhs, out, blueprint_strategy, dtypes)
+            }
+            Strategy::Mosaic(blueprint_strategy) => {
+                launch_mosaic::launch_ref(client, lhs, rhs, out, blueprint_strategy, dtypes)
             }
         }
     }
