@@ -14,7 +14,9 @@ use crate::{
         tile::TileMatmulKind,
     },
     definition::{MatmulElems, MatmulSetupError},
-    launch::{launch_gemm, launch_gemv_unit_perpendicular, launch_mosaic, launch_naive, launch_tiling},
+    launch::{
+        launch_gemm, launch_gemv_unit_perpendicular, launch_mosaic, launch_naive, launch_tiling,
+    },
     routines::{
         BlueprintStrategy, Routine,
         double_buffering::{
