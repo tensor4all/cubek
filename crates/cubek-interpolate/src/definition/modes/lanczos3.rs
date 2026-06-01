@@ -1,4 +1,8 @@
-use crate::definition::Interpolate;
+use crate::{
+    components::readers::ReaderType,
+    definition::{Interpolate, InterpolatePrecision, compute_value_default},
+    routines::InterpolateBlueprint,
+};
 use cubecl::prelude::*;
 
 #[derive(CubeType, Clone, Copy)]
@@ -22,6 +26,30 @@ impl Interpolate for Lanczos3 {
                 (pi_x.sin() * (pi_x / EA::new(3.0)).sin()) / safe_denom,
                 EA::new(0.0),
             ),
+        )
+    }
+
+    fn compute_value<P: InterpolatePrecision, N: Size>(
+        input: &Tensor<Vector<P::EI, N>>,
+        input_height: usize,
+        input_width: usize,
+        base_row: isize,
+        base_col: isize,
+        frac_row: P::EA,
+        frac_col: P::EA,
+        reader: ReaderType<P::EA, N>,
+        #[comptime] blueprint: InterpolateBlueprint,
+    ) -> Vector<P::EI, N> {
+        compute_value_default::<Self, P, N>(
+            input,
+            input_height,
+            input_width,
+            base_row,
+            base_col,
+            frac_row,
+            frac_col,
+            reader,
+            blueprint,
         )
     }
 }

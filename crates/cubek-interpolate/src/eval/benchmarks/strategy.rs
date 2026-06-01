@@ -14,14 +14,14 @@ pub fn strategies() -> Vec<CatalogEntry<InterpolateStrategy>> {
                 GlobalMemoryStrategy {},
             )),
         ),
-        CatalogEntry::new(
-            "shared_memory",
-            "Shared Memory",
-            InterpolateStrategy::SharedMemoryStrategy(BlueprintStrategy::Inferred(
-                SharedMemoryStrategy {
-                    shared_memory_height: 1,
-                },
-            )),
-        ),
+        // CatalogEntry::new(
+        //     "shared_memory",
+        //     "Shared Memory",
+        //     InterpolateStrategy::SharedMemoryStrategy(BlueprintStrategy::Inferred(
+        //         SharedMemoryStrategy {
+        //             shared_memory_height: 1,
+        //         },
+        //     )),
+        // ),
     ]
 }

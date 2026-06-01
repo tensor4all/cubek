@@ -116,16 +116,16 @@ fn compute_smem_size(
 ) -> (usize, usize) {
     let halo = get_halo(options.mode);
 
-    let scale_x = input_width as f64 / output_width as f64;
-    let scale_y = input_height as f64 / output_height as f64;
+    let scale_height = input_height as f64 / output_height as f64;
+    let scale_width = input_width as f64 / output_width as f64;
 
     // Calculate the distance between the first and last pixel.
-    let span_x = ((output_tile_size.width() as f64 - 1.0) * scale_x).max(0.0);
-    let span_y = ((output_tile_size.height() as f64 - 1.0) * scale_y).max(0.0);
+    let span_height = ((output_tile_size.height() as f64 - 1.0) * scale_height).max(0.0);
+    let span_width = ((output_tile_size.width() as f64 - 1.0) * scale_width).max(0.0);
 
     // Halo is added half on each side.
-    let smem_w = span_x.ceil() as usize + halo;
-    let smem_h = span_y.ceil() as usize + halo;
+    let smem_height = span_height.ceil() as usize + halo;
+    let smem_width = span_width.ceil() as usize + halo;
 
-    (smem_w.max(1), smem_h.max(1))
+    (smem_width.max(1), smem_height.max(1))
 }

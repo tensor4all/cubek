@@ -23,12 +23,19 @@ pub fn make_problem(
     InterpolateForwardProblem::from_input_output_shapes(&input_shape.into(), &output_size, options)
 }
 
+pub fn get_global_memory_strategy() -> InterpolateStrategy {
+    InterpolateStrategy::GlobalMemoryStrategy(BlueprintStrategy::<GlobalMemoryRoutine>::Inferred(
+        GlobalMemoryStrategy {},
+    ))
+}
+
 pub fn run_interpolate_global_test(
     client: ComputeClient<TestRuntime>,
     seed: u64,
     input_min: f32,
     input_max: f32,
     problem: InterpolateForwardProblem,
+    strategy: InterpolateStrategy,
     tolerance: f32,
 ) {
     let (input, input_data) = TestInput::builder(client.clone(), problem.input_shape())
@@ -45,9 +52,7 @@ pub fn run_interpolate_global_test(
         input.clone().binding(),
         output.clone().binding(),
         problem.options,
-        InterpolateStrategy::GlobalMemoryStrategy(
-            BlueprintStrategy::<GlobalMemoryRoutine>::Inferred(GlobalMemoryStrategy {}),
-        ),
+        strategy,
         input.dtype,
     );
 
