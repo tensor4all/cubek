@@ -1,7 +1,11 @@
 use cubecl::{TestRuntime, prelude::*};
-use cubek_interpolate::definition::{InterpolateMode, InterpolateOptions};
+use cubek_interpolate::{
+    definition::{InterpolateMode, InterpolateOptions},
+    launch::InterpolateStrategy,
+    routines::{BlueprintStrategy, GlobalMemoryRoutine, GlobalMemoryStrategy},
+};
 
-use super::{get_global_memory_strategy, make_problem, run_interpolate_global_test};
+use super::{make_problem, run_interpolate_global_test};
 
 const BICUBIC_TOLERANCE: f32 = 0.00001;
 
@@ -19,7 +23,9 @@ fn test_interpolate_bicubic_identity() {
         -1.0,
         1.0,
         problem,
-        get_global_memory_strategy(),
+        InterpolateStrategy::GlobalMemoryStrategy(
+            BlueprintStrategy::<GlobalMemoryRoutine>::Inferred(GlobalMemoryStrategy {}),
+        ),
         BICUBIC_TOLERANCE,
     );
 }
@@ -38,7 +44,9 @@ fn test_interpolate_bicubic_upsample() {
         -10.0,
         10.0,
         problem,
-        get_global_memory_strategy(),
+        InterpolateStrategy::GlobalMemoryStrategy(
+            BlueprintStrategy::<GlobalMemoryRoutine>::Inferred(GlobalMemoryStrategy {}),
+        ),
         BICUBIC_TOLERANCE,
     );
 }
@@ -57,7 +65,9 @@ fn test_interpolate_bicubic_downsample() {
         -100.0,
         100.0,
         problem,
-        get_global_memory_strategy(),
+        InterpolateStrategy::GlobalMemoryStrategy(
+            BlueprintStrategy::<GlobalMemoryRoutine>::Inferred(GlobalMemoryStrategy {}),
+        ),
         BICUBIC_TOLERANCE,
     );
 }
@@ -76,7 +86,9 @@ fn test_interpolate_bicubic_resize() {
         -1.0,
         1.0,
         problem,
-        get_global_memory_strategy(),
+        InterpolateStrategy::GlobalMemoryStrategy(
+            BlueprintStrategy::<GlobalMemoryRoutine>::Inferred(GlobalMemoryStrategy {}),
+        ),
         BICUBIC_TOLERANCE,
     );
 }
@@ -95,7 +107,9 @@ fn test_interpolate_bicubic_without_align_corners() {
         -10.0,
         10.0,
         problem,
-        get_global_memory_strategy(),
+        InterpolateStrategy::GlobalMemoryStrategy(
+            BlueprintStrategy::<GlobalMemoryRoutine>::Inferred(GlobalMemoryStrategy {}),
+        ),
         BICUBIC_TOLERANCE,
     );
 }
