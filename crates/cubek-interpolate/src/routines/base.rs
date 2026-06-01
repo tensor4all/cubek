@@ -10,6 +10,8 @@ pub struct InterpolateLaunchSettings {
     pub cube_count: CubeCount,
     pub cube_dim: CubeDim,
     pub tile_size: TileSize,
+    pub num_tiles_width: usize,
+    pub num_tiles_height: usize,
     pub smem_width: usize,
     pub smem_height: usize,
     pub channel_groups: usize,
@@ -44,13 +46,16 @@ pub(crate) fn prepare_launch_settings<R: Runtime>(
 ) -> Result<InterpolateLaunchSettings, InterpolateError> {
     let channel_groups = problem.channels / vector_size;
 
-    let mut working_units =
-        problem.output_width * problem.output_height * problem.batch * channel_groups;
+    let mut working_units = problem.output_width * problem.output_height * channel_groups;
 
     let (cube_dim, tile_size, smem_width, smem_height) = loop {
         let cube_dim = CubeDim::new(client, working_units);
 
-        let tile_size = TileSize::new(cube_dim.x as usize, cube_dim.y as usize, options);
+        let tile_size = TileSize::new(
+            cube_dim.x as usize / channel_groups,
+            cube_dim.y as usize,
+            options,
+        );
 
         let (smem_width, smem_height) = match max_shared_memory_bytes {
             Some(max_shared_memory_bytes) => {
@@ -85,13 +90,23 @@ pub(crate) fn prepare_launch_settings<R: Runtime>(
         break (cube_dim, tile_size, smem_width, smem_height);
     };
 
-    let (num_tiles_width, num_tiles_height) = (
-        problem.output_width.div_ceil(tile_size.width()),
-        problem.output_height.div_ceil(tile_size.height()),
-    );
+    let (num_tiles_width, num_tiles_height) = if tile_size.is_row_vector() {
+        const MAX_DISPATCH: usize = 65535;
+        let total_tiles =
+            (problem.output_width * problem.output_height).div_ceil(tile_size.width());
+        (
+            total_tiles.min(MAX_DISPATCH),
+            total_tiles.div_ceil(MAX_DISPATCH),
+        )
+    } else {
+        (
+            problem.output_width.div_ceil(tile_size.width()),
+            problem.output_height.div_ceil(tile_size.height()),
+        )
+    };
 
     let cube_count = CubeCount::Static(
-        (num_tiles_width * channel_groups) as u32,
+        num_tiles_width as u32,
         num_tiles_height as u32,
         problem.batch as u32,
     );
@@ -100,6 +115,8 @@ pub(crate) fn prepare_launch_settings<R: Runtime>(
         cube_count,
         cube_dim,
         tile_size,
+        num_tiles_width,
+        num_tiles_height,
         smem_width,
         smem_height,
         channel_groups,

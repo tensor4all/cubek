@@ -2,7 +2,10 @@ use cubecl::{TestRuntime, prelude::*};
 use cubek_interpolate::{
     definition::{InterpolateMode, InterpolateOptions, NearestMode},
     launch::InterpolateStrategy,
-    routines::{BlueprintStrategy, GlobalMemoryRoutine, GlobalMemoryStrategy},
+    routines::{
+        BlueprintStrategy, GlobalMemoryRoutine, GlobalMemoryStrategy, SharedMemoryRoutine,
+        SharedMemoryStrategy,
+    },
 };
 
 use super::{make_problem, run_interpolate_global_test};
@@ -46,6 +49,29 @@ fn test_interpolate_nearest_exact_identity() {
         problem,
         InterpolateStrategy::GlobalMemoryStrategy(
             BlueprintStrategy::<GlobalMemoryRoutine>::Inferred(GlobalMemoryStrategy {}),
+        ),
+        NEAREST_TOLERANCE,
+    );
+}
+
+#[test]
+fn test_interpolate_nearest_shared_memory_identity() {
+    let client = TestRuntime::client(&Default::default());
+    let problem = make_problem(
+        [1, 4, 4, 16],
+        [4, 4],
+        InterpolateOptions::new(InterpolateMode::Nearest(NearestMode::Floor)),
+    );
+    run_interpolate_global_test(
+        client,
+        5678,
+        -1.0,
+        1.0,
+        problem,
+        InterpolateStrategy::SharedMemoryStrategy(
+            BlueprintStrategy::<SharedMemoryRoutine>::Inferred(SharedMemoryStrategy {
+                shared_memory_height: 1,
+            }),
         ),
         NEAREST_TOLERANCE,
     );
