@@ -1,7 +1,6 @@
 use crate::{
     components::readers::ReaderType,
     definition::{Interpolate, InterpolatePrecision, compute_value_default},
-    routines::InterpolateBlueprint,
 };
 use cubecl::prelude::*;
 
@@ -11,6 +10,8 @@ pub struct Bicubic {}
 #[cube]
 impl Interpolate for Bicubic {
     const HALO: usize = 4;
+
+    const REQUIRES_BOUND_CHECK: bool = false;
 
     fn compute_weight<EA: Float>(x: EA) -> EA {
         let a = EA::new(-0.75);
@@ -41,7 +42,6 @@ impl Interpolate for Bicubic {
         frac_row: P::EA,
         frac_col: P::EA,
         reader: ReaderType<P::EA, N>,
-        #[comptime] blueprint: InterpolateBlueprint,
     ) -> Vector<P::EI, N> {
         compute_value_default::<Self, P, N>(
             input,
@@ -52,7 +52,6 @@ impl Interpolate for Bicubic {
             frac_row,
             frac_col,
             reader,
-            blueprint,
         )
     }
 }

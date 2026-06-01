@@ -1,7 +1,6 @@
 use crate::{
     components::readers::ReaderType,
     definition::{Interpolate, InterpolatePrecision, compute_value_default},
-    routines::InterpolateBlueprint,
 };
 use cubecl::prelude::*;
 
@@ -11,6 +10,8 @@ pub struct Lanczos3 {}
 #[cube]
 impl Interpolate for Lanczos3 {
     const HALO: usize = 6;
+
+    const REQUIRES_BOUND_CHECK: bool = true;
 
     fn compute_weight<EA: Float>(x: EA) -> EA {
         let abs_x = x.abs();
@@ -38,7 +39,6 @@ impl Interpolate for Lanczos3 {
         frac_row: P::EA,
         frac_col: P::EA,
         reader: ReaderType<P::EA, N>,
-        #[comptime] blueprint: InterpolateBlueprint,
     ) -> Vector<P::EI, N> {
         compute_value_default::<Self, P, N>(
             input,
@@ -49,7 +49,6 @@ impl Interpolate for Lanczos3 {
             frac_row,
             frac_col,
             reader,
-            blueprint,
         )
     }
 }

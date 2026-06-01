@@ -1,7 +1,6 @@
 use crate::{
     components::readers::ReaderType,
     definition::{Interpolate, InterpolatePrecision},
-    routines::InterpolateBlueprint,
 };
 use cubecl::prelude::*;
 
@@ -11,6 +10,8 @@ pub struct Nearest {}
 #[cube]
 impl Interpolate for Nearest {
     const HALO: usize = 1;
+
+    const REQUIRES_BOUND_CHECK: bool = false;
 
     fn compute_weight<EA: Float>(_x: EA) -> EA {
         EA::new(1.0)
@@ -25,7 +26,6 @@ impl Interpolate for Nearest {
         _frac_row: P::EA,
         _frac_col: P::EA,
         reader: ReaderType<P::EA, N>,
-        #[comptime] _blueprint: InterpolateBlueprint,
     ) -> Vector<P::EI, N> {
         let clamped_row = base_row.max(0).min(input_height as isize - 1) as usize;
         let clamped_col = base_col.max(0).min(input_width as isize - 1) as usize;
