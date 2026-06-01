@@ -46,13 +46,14 @@ pub(crate) fn prepare_launch_settings<R: Runtime>(
 ) -> Result<InterpolateLaunchSettings, InterpolateError> {
     let channel_groups = problem.channels / vector_size;
 
-    let mut working_units = problem.output_width * problem.output_height * channel_groups;
+    let mut working_units =
+        problem.batch * problem.output_width * problem.output_height * channel_groups;
 
     let (cube_dim, tile_size, smem_width, smem_height) = loop {
         let cube_dim = CubeDim::new(client, working_units);
 
         let tile_size = TileSize::new(
-            cube_dim.x as usize / channel_groups,
+            cube_dim.x as usize / (problem.batch * channel_groups),
             cube_dim.y as usize,
             options,
         );
@@ -105,11 +106,7 @@ pub(crate) fn prepare_launch_settings<R: Runtime>(
         )
     };
 
-    let cube_count = CubeCount::Static(
-        num_tiles_width as u32,
-        num_tiles_height as u32,
-        problem.batch as u32,
-    );
+    let cube_count = CubeCount::Static(num_tiles_width as u32, num_tiles_height as u32, 1);
 
     Ok(InterpolateLaunchSettings {
         cube_count,
