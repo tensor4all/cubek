@@ -18,7 +18,7 @@ pub fn execute_interpolate<P: InterpolatePrecision, N: Size>(
     cube_shape: Sequence<FastDivmod<usize>>,
     #[comptime] blueprint: InterpolateBlueprint,
 ) {
-    let (unit_pos, channel_group) = cube_shape[0].div_mod(UNIT_POS as usize);
+    let (unit_pos, channel) = cube_shape[0].div_mod(UNIT_POS as usize);
     let (batch, cube_pos) = cube_shape[1].div_mod(CUBE_POS);
 
     let (output_height, output_width) = (output.shape(1), output.shape(2));
@@ -50,7 +50,7 @@ pub fn execute_interpolate<P: InterpolatePrecision, N: Size>(
         input,
         cube_pos,
         batch,
-        channel_group,
+        channel,
         input_height,
         input_width,
         output_height,
@@ -74,7 +74,7 @@ pub fn execute_interpolate<P: InterpolatePrecision, N: Size>(
         Writer::write(
             output,
             batch,
-            channel_group,
+            channel,
             output_row,
             output_col,
             vector_size,
@@ -138,7 +138,7 @@ fn get_reader<P: InterpolatePrecision, N: Size>(
     input: &Tensor<Vector<P::EI, N>>,
     cube_pos: usize,
     batch: usize,
-    channel_group: usize,
+    channel: usize,
     input_height: usize,
     input_width: usize,
     output_height: usize,
@@ -152,7 +152,7 @@ fn get_reader<P: InterpolatePrecision, N: Size>(
             ReaderType::<P::EA, N>::new_Global(GlobalMemoryReader::new(
                 input,
                 batch,
-                channel_group,
+                channel,
                 input_height,
                 input_width,
                 vector_size,
@@ -186,7 +186,7 @@ fn get_reader<P: InterpolatePrecision, N: Size>(
             ReaderType::new_Shared(SharedMemoryReader::new(
                 input,
                 batch,
-                channel_group,
+                channel,
                 input_height,
                 input_width,
                 min_row,

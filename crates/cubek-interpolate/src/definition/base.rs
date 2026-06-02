@@ -159,7 +159,7 @@ pub fn compute_value_default<I: Interpolate, P: InterpolatePrecision, N: Size>(
     frac_col: P::EA,
     reader: ReaderType<P::EA, N>,
 ) -> Vector<P::EI, N> {
-    let halo = comptime!(I::HALO);
+    let halo = I::HALO;
     let radius_offset = ((halo - 1) / 2) as isize;
 
     let mut col_weights = Array::<Vector<P::EA, N>>::new(halo);
@@ -167,11 +167,10 @@ pub fn compute_value_default<I: Interpolate, P: InterpolatePrecision, N: Size>(
 
     #[unroll]
     for i in 0..halo {
-        let d_col = P::EA::cast_from(i as isize - radius_offset) - frac_col;
-        col_weights[i] = Vector::cast_from(I::compute_weight::<P::EA>(d_col));
+        let offset = P::EA::cast_from(radius_offset - i as isize);
 
-        let d_row = P::EA::cast_from(i as isize - radius_offset) - frac_row;
-        row_weights[i] = Vector::cast_from(I::compute_weight::<P::EA>(d_row));
+        col_weights[i] = Vector::cast_from(I::compute_weight::<P::EA>(frac_col + offset));
+        row_weights[i] = Vector::cast_from(I::compute_weight::<P::EA>(frac_row + offset));
     }
 
     let mut final_value = Vector::zeroed();
@@ -195,18 +194,14 @@ pub fn compute_value_default<I: Interpolate, P: InterpolatePrecision, N: Size>(
             let read_val =
                 reader.read_weighted::<P::EI>(input, clamped_row, clamped_col, weight_col);
 
-            if comptime!(I::REQUIRES_BOUND_CHECK) {
+            if I::REQUIRES_BOUND_CHECK {
                 let is_in_bounds = col >= 0
                     && col < input_width as isize
                     && row >= 0
                     && row < input_height as isize;
 
                 row_value += select(is_in_bounds, read_val, Vector::zeroed());
-                row_weight_sum += select(
-                    is_in_bounds,
-                    Vector::cast_from(weight_col),
-                    Vector::zeroed(),
-                );
+                row_weight_sum += select(is_in_bounds, weight_col, Vector::zeroed());
             } else {
                 row_value += read_val;
             }
@@ -214,15 +209,15 @@ pub fn compute_value_default<I: Interpolate, P: InterpolatePrecision, N: Size>(
 
         let weight_row = row_weights[i];
 
-        final_value += row_value * Vector::cast_from(weight_row);
+        final_value += row_value * weight_row;
 
-        if comptime!(I::REQUIRES_BOUND_CHECK) {
-            total_weight += row_weight_sum * Vector::cast_from(weight_row);
+        if I::REQUIRES_BOUND_CHECK {
+            total_weight += row_weight_sum * weight_row;
         }
     }
 
-    if comptime!(I::REQUIRES_BOUND_CHECK) {
-        let epsilon = Vector::<P::EA, N>::cast_from(P::EA::new(1e-7));
+    if I::REQUIRES_BOUND_CHECK {
+        let epsilon = Vector::cast_from(P::EA::new(1e-7));
         Vector::cast_from(final_value / total_weight.max(epsilon))
     } else {
         Vector::cast_from(final_value)

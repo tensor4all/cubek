@@ -2,9 +2,7 @@ use crate::{
     InterpolateError,
     {
         components::global::execute_interpolate,
-        definition::{
-            InterpolateForwardProblem, InterpolateMode, InterpolateOptions, accumulator_dtype,
-        },
+        definition::{InterpolateForwardProblem, InterpolateOptions, accumulator_dtype},
         launch::InterpolateStrategy,
         routines::{
             ForwardRoutine, GlobalMemoryRoutine, InterpolateBlueprint, SharedMemoryRoutine,
@@ -65,11 +63,9 @@ pub fn interpolate_launch<R: Runtime>(
     };
 
     let cube_shape = get_cube_shape(
-        settings.channel_groups,
+        settings.channels,
         settings.num_tiles_width * settings.num_tiles_height,
     );
-
-    println!("Launching interpolate kernel with settings: {settings:#?}");
 
     unsafe {
         interpolate_kernel::launch_unchecked(
@@ -103,11 +99,11 @@ fn interpolate_kernel<EI: Float, EA: Float, N: Size>(
 }
 
 fn get_cube_shape<R: Runtime>(
-    channel_groups: usize,
+    channels: usize,
     cubes_per_batch: usize,
 ) -> SequenceArg<R, FastDivmod<usize>> {
     let mut cube_shape = SequenceArg::new();
-    cube_shape.push(channel_groups);
+    cube_shape.push(channels);
     cube_shape.push(cubes_per_batch);
     cube_shape
 }
