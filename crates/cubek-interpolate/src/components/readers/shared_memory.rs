@@ -30,10 +30,6 @@ impl<EA: Float, N: Size> SharedMemoryReader<EA, N> {
         let mut smem = Shared::new_slice(smem_size);
         let cube_dim = CUBE_DIM as usize;
 
-        if CUBE_POS != 1 {
-            terminate!();
-        }
-
         let mut i = UNIT_POS as usize;
         while i < smem_size {
             let channel = i % blueprint.channel_groups;

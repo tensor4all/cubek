@@ -2,7 +2,9 @@ use crate::{
     InterpolateError,
     {
         components::global::execute_interpolate,
-        definition::{InterpolateForwardProblem, InterpolateOptions, accumulator_dtype},
+        definition::{
+            InterpolateForwardProblem, InterpolateMode, InterpolateOptions, accumulator_dtype,
+        },
         launch::InterpolateStrategy,
         routines::{
             ForwardRoutine, GlobalMemoryRoutine, InterpolateBlueprint, SharedMemoryRoutine,
@@ -13,12 +15,20 @@ use cubecl::{prelude::*, std::FastDivmod, tensor_vector_size_parallel};
 
 pub fn interpolate_launch<R: Runtime>(
     client: &ComputeClient<R>,
-    input: TensorBinding<R>,
-    output: TensorBinding<R>,
+    mut input: TensorBinding<R>,
+    mut output: TensorBinding<R>,
     options: InterpolateOptions,
     strategy: InterpolateStrategy,
     dtype: StorageType,
 ) -> Result<(), InterpolateError> {
+    let output_height = output.shape[1];
+    if let InterpolateMode::Nearest(_) = options.mode {
+        input.shape[2] *= input.shape[1];
+        input.shape[1] = 1;
+        output.shape[2] *= output.shape[1];
+        output.shape[1] = 1;
+    }
+
     let acc_dtype = accumulator_dtype(dtype);
     let vector_size = tensor_vector_size_parallel(
         client.io_optimized_vector_sizes(dtype.size()),
@@ -85,6 +95,11 @@ pub fn interpolate_launch<R: Runtime>(
             acc_dtype,
         )
     };
+
+    if let InterpolateMode::Nearest(_) = options.mode {
+        output.shape[2] /= output_height;
+        output.shape[1] = output_height;
+    }
 
     Ok(())
 }
