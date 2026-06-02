@@ -68,6 +68,8 @@ pub fn interpolate_launch<R: Runtime>(
         settings.num_tiles_width * settings.num_tiles_height,
     );
 
+    println!("Launching interpolate kernel with settings: {settings:#?}");
+
     unsafe {
         interpolate_kernel::launch_unchecked(
             client,

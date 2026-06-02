@@ -30,35 +30,27 @@ impl<EA: Float, N: Size> SharedMemoryReader<EA, N> {
         let mut smem = Shared::new_slice(smem_size);
         let cube_dim = CUBE_DIM as usize;
 
+        if CUBE_POS != 1 {
+            terminate!();
+        }
+
         let mut i = UNIT_POS as usize;
         while i < smem_size {
-            let local_c = i % blueprint.channel_groups;
-            let local_offset = i / blueprint.channel_groups;
+            let channel = i % blueprint.channel_groups;
+            let spatial_i = i / blueprint.channel_groups;
+            let local_col = spatial_i % blueprint.smem_width;
+            let local_row = spatial_i / blueprint.smem_width;
 
-            let (global_y, global_x) = if comptime!(blueprint.smem_height == 1) {
-                let flat_start = (min_row * input_width as isize) + min_col;
-                let flat_current = flat_start + local_offset as isize;
+            let (global_row, global_col) =
+                (min_row + local_row as isize, min_col + local_col as isize);
 
-                (
-                    flat_current / input_width as isize,
-                    flat_current % input_width as isize,
-                )
-            } else {
-                let local_x = local_offset % blueprint.smem_width;
-                let local_y = local_offset / blueprint.smem_width;
-
-                (min_row + local_y as isize, min_col + local_x as isize)
-            };
-
-            let global_idx = (batch * input.stride(0)
-                + local_c * input.stride(3) * vector_size
-                + global_y.max(0).min(input_height.saturating_sub(1) as isize) as usize
-                    * input.stride(1)
-                + global_x.max(0).min(input_width.saturating_sub(1) as isize) as usize
-                    * input.stride(2))
+            let input_idx = (batch * input.stride(0)
+                + global_row.max(0).min((input_height - 1) as isize) as usize * input.stride(1)
+                + global_col.max(0).min((input_width - 1) as isize) as usize * input.stride(2)
+                + channel * input.stride(3) * vector_size)
                 / vector_size;
 
-            smem[i] = Vector::cast_from(input[global_idx]);
+            smem[i] = Vector::cast_from(input[input_idx]);
             i += cube_dim;
         }
 
@@ -83,9 +75,8 @@ impl<EA: Float, N: Size> SharedMemoryReader<EA, N> {
         let local_row = (row as isize - self.min_row).max(0) as usize;
         let local_col = (col as isize - self.min_col).max(0) as usize;
 
-        let smem_idx = (local_row * self.smem_width * self.channel_groups)
-            + (local_col * self.channel_groups)
-            + self.channel_group;
+        let smem_idx =
+            (local_row * self.smem_width + local_col) * self.channel_groups + self.channel_group;
 
         self.smem[smem_idx] * weight
     }

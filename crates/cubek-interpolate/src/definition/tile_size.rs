@@ -9,10 +9,10 @@ pub struct TileSize {
 
 impl TileSize {
     pub fn new(w: usize, h: usize, options: InterpolateOptions) -> Self {
-        if get_halo(options.mode) == 1 {
-            return Self { w: w * h, h: 1 };
-        }
-        Self { w, h }
+        let halo = get_halo(options.mode);
+        let width = (w * h).div_ceil(halo);
+
+        Self { w: width, h: halo }
     }
 
     pub fn width(&self) -> usize {

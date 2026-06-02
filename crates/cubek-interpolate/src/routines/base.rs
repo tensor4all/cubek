@@ -46,14 +46,13 @@ pub(crate) fn prepare_launch_settings<R: Runtime>(
 ) -> Result<InterpolateLaunchSettings, InterpolateError> {
     let channel_groups = problem.channels / vector_size;
 
-    let mut working_units =
-        problem.batch * problem.output_width * problem.output_height * channel_groups;
+    let mut working_units = problem.output_width * problem.output_height * channel_groups;
 
     let (cube_dim, tile_size, smem_width, smem_height) = loop {
         let cube_dim = CubeDim::new(client, working_units);
 
         let tile_size = TileSize::new(
-            cube_dim.x as usize / (problem.batch * channel_groups),
+            cube_dim.x as usize / channel_groups,
             cube_dim.y as usize,
             options,
         );
@@ -69,7 +68,8 @@ pub(crate) fn prepare_launch_settings<R: Runtime>(
                     tile_size,
                 );
 
-                let requested_smem_bytes = smem_width * smem_height * bytes_per_element;
+                let requested_smem_bytes =
+                    smem_width * smem_height * channel_groups * bytes_per_element;
 
                 if requested_smem_bytes <= max_shared_memory_bytes {
                     break (cube_dim, tile_size, smem_width, smem_height);
@@ -92,6 +92,7 @@ pub(crate) fn prepare_launch_settings<R: Runtime>(
     };
 
     let (num_tiles_width, num_tiles_height) = if tile_size.is_row_vector() {
+        // Calculate the number of tiles needed to cover the output, and dispatch in a 1D grid.
         const MAX_DISPATCH: usize = 65535;
         let total_tiles =
             (problem.output_width * problem.output_height).div_ceil(tile_size.width());
@@ -106,7 +107,11 @@ pub(crate) fn prepare_launch_settings<R: Runtime>(
         )
     };
 
-    let cube_count = CubeCount::Static(num_tiles_width as u32, num_tiles_height as u32, 1);
+    let cube_count = CubeCount::Static(
+        num_tiles_width as u32,
+        num_tiles_height as u32,
+        problem.batch as u32,
+    );
 
     Ok(InterpolateLaunchSettings {
         cube_count,
