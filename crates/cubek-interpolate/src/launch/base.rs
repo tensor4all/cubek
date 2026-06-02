@@ -15,20 +15,12 @@ use cubecl::{prelude::*, std::FastDivmod, tensor_vector_size_parallel};
 
 pub fn interpolate_launch<R: Runtime>(
     client: &ComputeClient<R>,
-    mut input: TensorBinding<R>,
-    mut output: TensorBinding<R>,
+    input: TensorBinding<R>,
+    output: TensorBinding<R>,
     options: InterpolateOptions,
     strategy: InterpolateStrategy,
     dtype: StorageType,
 ) -> Result<(), InterpolateError> {
-    let output_height = output.shape[1];
-    if let InterpolateMode::Nearest(_) = options.mode {
-        input.shape[2] *= input.shape[1];
-        input.shape[1] = 1;
-        output.shape[2] *= output.shape[1];
-        output.shape[1] = 1;
-    }
-
     let acc_dtype = accumulator_dtype(dtype);
     let vector_size = tensor_vector_size_parallel(
         client.io_optimized_vector_sizes(dtype.size()),
@@ -74,7 +66,6 @@ pub fn interpolate_launch<R: Runtime>(
 
     let cube_shape = get_cube_shape(
         settings.channel_groups,
-        settings.tile_size.area(),
         settings.num_tiles_width * settings.num_tiles_height,
     );
 
@@ -96,11 +87,6 @@ pub fn interpolate_launch<R: Runtime>(
         )
     };
 
-    if let InterpolateMode::Nearest(_) = options.mode {
-        output.shape[2] /= output_height;
-        output.shape[1] = output_height;
-    }
-
     Ok(())
 }
 
@@ -118,12 +104,10 @@ fn interpolate_kernel<EI: Float, EA: Float, N: Size>(
 
 fn get_cube_shape<R: Runtime>(
     channel_groups: usize,
-    threads_per_cube: usize,
     cubes_per_batch: usize,
 ) -> SequenceArg<R, FastDivmod<usize>> {
     let mut cube_shape = SequenceArg::new();
     cube_shape.push(channel_groups);
-    cube_shape.push(threads_per_cube);
     cube_shape.push(cubes_per_batch);
     cube_shape
 }

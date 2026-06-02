@@ -236,7 +236,7 @@ fn test_interpolate_lanczos3_shared_memory_without_align_corners() {
 }
 
 #[test]
-fn test_interpolate_lanczos3_shared_memory_high_resolution() {
+fn test_interpolate_lanczos3_high_resolution() {
     let client = TestRuntime::client(&Default::default());
     let problem = make_problem(
         [5, 89, 43, 13],
@@ -249,21 +249,19 @@ fn test_interpolate_lanczos3_shared_memory_high_resolution() {
         -10.0,
         10.0,
         problem,
-        InterpolateStrategy::SharedMemoryStrategy(
-            BlueprintStrategy::<SharedMemoryRoutine>::Inferred(SharedMemoryStrategy {
-                shared_memory_height: SHARED_MEMORY_HEIGHT,
-            }),
+        InterpolateStrategy::GlobalMemoryStrategy(
+            BlueprintStrategy::<GlobalMemoryRoutine>::Inferred(GlobalMemoryStrategy {}),
         ),
         LANCZOS3_HIGH_RESOLUTION_TOLERANCE,
     );
 }
 
 #[test]
-fn test_interpolate_lanczos3_shared_memory_test() {
+fn test_interpolate_lanczos3_shared_memory_high_resolution() {
     let client = TestRuntime::client(&Default::default());
     let problem = make_problem(
-        [1, 2, 2, 3],
-        [5, 5],
+        [5, 89, 43, 13],
+        [321, 75],
         InterpolateOptions::new(InterpolateMode::Lanczos3),
     );
     run_interpolate_global_test(

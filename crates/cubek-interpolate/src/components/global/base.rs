@@ -18,9 +18,8 @@ pub fn execute_interpolate<P: InterpolatePrecision, N: Size>(
     cube_shape: Sequence<FastDivmod<usize>>,
     #[comptime] blueprint: InterpolateBlueprint,
 ) {
-    // let (batch, cube_pos, unit_pos, channel_group) = decompose_index(ABSOLUTE_POS, cube_shape);
     let (unit_pos, channel_group) = cube_shape[0].div_mod(UNIT_POS as usize);
-    let (batch, cube_pos) = cube_shape[2].div_mod(CUBE_POS);
+    let (batch, cube_pos) = cube_shape[1].div_mod(CUBE_POS);
 
     let (output_height, output_width) = (output.shape(1), output.shape(2));
     let (input_height, input_width) = (input.shape(1), input.shape(2));
@@ -82,17 +81,6 @@ pub fn execute_interpolate<P: InterpolatePrecision, N: Size>(
             final_value,
         );
     }
-}
-
-#[cube]
-fn decompose_index(
-    index: usize,
-    cube_shape: Sequence<FastDivmod<usize>>,
-) -> (usize, usize, usize, usize) {
-    let (rem, channel_group) = cube_shape[0].div_mod(index);
-    let (rem, unit_pos) = cube_shape[1].div_mod(rem);
-    let (batch, cube_pos) = cube_shape[2].div_mod(rem);
-    (batch, cube_pos, unit_pos, channel_group)
 }
 
 // Computes the input coordinates corresponding to an output coordinates.

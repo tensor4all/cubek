@@ -278,26 +278,3 @@ fn test_interpolate_bilinear_shared_memory_high_resolution() {
         BILINEAR_HIGH_RESOLUTION_TOLERANCE,
     );
 }
-
-#[test]
-fn test_interpolate_bilinear_shared_memory_test() {
-    let client = TestRuntime::client(&Default::default());
-    let problem = make_problem(
-        [1, 2, 2, 3],
-        [5, 5],
-        InterpolateOptions::new(InterpolateMode::Bilinear),
-    );
-    run_interpolate_global_test(
-        client,
-        122,
-        -10.0,
-        10.0,
-        problem,
-        InterpolateStrategy::SharedMemoryStrategy(
-            BlueprintStrategy::<SharedMemoryRoutine>::Inferred(SharedMemoryStrategy {
-                shared_memory_height: SHARED_MEMORY_HEIGHT,
-            }),
-        ),
-        BILINEAR_HIGH_RESOLUTION_TOLERANCE,
-    );
-}
