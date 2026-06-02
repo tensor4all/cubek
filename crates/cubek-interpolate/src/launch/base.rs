@@ -66,7 +66,7 @@ pub fn interpolate_launch<R: Runtime>(
     };
 
     let cube_shape = get_cube_shape(
-        settings.channels,
+        settings.channel_groups,
         settings.num_tiles_width * settings.num_tiles_height,
     );
 
@@ -104,11 +104,11 @@ fn interpolate_kernel<EI: Float, EA: Float, N: Size>(
 }
 
 fn get_cube_shape<R: Runtime>(
-    channels: usize,
+    channel_groups: usize,
     cubes_per_batch: usize,
 ) -> SequenceArg<R, FastDivmod<usize>> {
     let mut cube_shape = SequenceArg::new();
-    cube_shape.push(channels);
+    cube_shape.push(channel_groups);
     cube_shape.push(cubes_per_batch);
     cube_shape
 }

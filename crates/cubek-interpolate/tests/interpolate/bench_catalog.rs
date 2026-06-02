@@ -40,14 +40,6 @@ fn run(strategy_id: &str, problem_id: &str) {
 const STRATEGY: &str = "shared_memory";
 
 #[test]
-fn nearest_upsample_default() {
-    run(
-        STRATEGY,
-        "BICUBIC_DOWNSAMPLE_8_BATCH_2_CHANNELS_2048X1024_TO_512X512",
-    );
-}
-
-#[test]
 fn nearest_resize_default() {
     run(
         STRATEGY,

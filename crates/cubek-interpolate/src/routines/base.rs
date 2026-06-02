@@ -14,7 +14,7 @@ pub struct InterpolateLaunchSettings {
     pub num_tiles_height: usize,
     pub smem_width: usize,
     pub smem_height: usize,
-    pub channels: usize,
+    pub channel_groups: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -44,14 +44,15 @@ pub(crate) fn prepare_launch_settings<R: Runtime>(
     vector_size: usize,
     max_shared_memory_bytes: Option<usize>,
 ) -> Result<InterpolateLaunchSettings, InterpolateError> {
-    let channels = problem.channels / vector_size;
+    let channel_groups = problem.channels / vector_size;
 
-    let mut working_units = problem.output_width * problem.output_height * channels;
+    let mut working_units = problem.output_width * problem.output_height * channel_groups;
 
     let (cube_dim, tile_size, smem_width, smem_height) = loop {
         let cube_dim = CubeDim::new(client, working_units);
 
-        let tile_size = TileSize::new(cube_dim.y as usize, cube_dim.x as usize / channels, options);
+        let tile_size =
+            TileSize::new(cube_dim.y as usize, cube_dim.x as usize / channel_groups, options);
 
         let (smem_width, smem_height) = match max_shared_memory_bytes {
             Some(max_shared_memory_bytes) => {
@@ -64,7 +65,8 @@ pub(crate) fn prepare_launch_settings<R: Runtime>(
                     tile_size,
                 );
 
-                let requested_smem_bytes = smem_width * smem_height * channels * bytes_per_element;
+                let requested_smem_bytes =
+                    smem_width * smem_height * channel_groups * bytes_per_element;
 
                 if requested_smem_bytes <= max_shared_memory_bytes {
                     break (cube_dim, tile_size, smem_width, smem_height);
@@ -116,7 +118,7 @@ pub(crate) fn prepare_launch_settings<R: Runtime>(
         num_tiles_height,
         smem_width,
         smem_height,
-        channels,
+        channel_groups,
     })
 }
 

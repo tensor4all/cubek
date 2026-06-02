@@ -44,7 +44,7 @@ impl ForwardRoutine for SharedMemoryRoutine {
             global: GlobalInterpolateBlueprint::SharedMemoryBlueprint(SharedMemoryBlueprint {
                 smem_width: settings.smem_width,
                 smem_height: settings.smem_height,
-                channels: settings.channels,
+                channel_groups: settings.channel_groups,
             }),
         };
 
