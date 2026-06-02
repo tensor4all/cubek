@@ -24,8 +24,13 @@ pub fn execute_interpolate<P: InterpolatePrecision, N: Size>(
     let (output_height, output_width) = (output.shape(1), output.shape(2));
     let (input_height, input_width) = (input.shape(1), input.shape(2));
 
-    let (output_row, output_col) =
-        tile_absolute_coords(output_width, cube_pos, unit_pos, blueprint.tile_size);
+    let (output_row, output_col) = tile_absolute_coords(
+        output_width,
+        cube_pos,
+        unit_pos,
+        blueprint.tile_size,
+        blueprint.options,
+    );
 
     let (input_row, input_col) = compute_input_coords::<P::EA>(
         output_row,
@@ -162,8 +167,13 @@ fn get_reader<P: InterpolatePrecision, N: Size>(
             let halo = comptime!(get_halo(blueprint.options.mode));
             let radius_offset = (halo - 1) / 2;
 
-            let (tile_row, tile_col) =
-                tile_absolute_coords(output_width, cube_pos, 0, blueprint.tile_size);
+            let (tile_row, tile_col) = tile_absolute_coords(
+                output_width,
+                cube_pos,
+                0,
+                blueprint.tile_size,
+                blueprint.options,
+            );
 
             let (tile_mapped_row, tile_mapped_col) = compute_input_coords::<P::EA>(
                 tile_row,

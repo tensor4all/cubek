@@ -81,6 +81,14 @@ impl InterpolateOptions {
     }
 }
 
+#[cube]
+pub fn is_flattened(#[comptime] options: InterpolateOptions) -> bool {
+    match options.mode {
+        InterpolateMode::Nearest(_) => true,
+        _ => false,
+    }
+}
+
 // Helper functions to map InterpolateMode to the corresponding Interpolate implementation.
 pub fn get_halo(mode: InterpolateMode) -> usize {
     match mode {

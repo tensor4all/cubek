@@ -1,6 +1,6 @@
 use crate::{
     InterpolateError,
-    definition::{InterpolateForwardProblem, InterpolateOptions, TileSize, get_halo},
+    definition::{InterpolateForwardProblem, InterpolateOptions, TileSize, get_halo, is_flattened},
     routines::InterpolateBlueprint,
 };
 use cubecl::prelude::*;
@@ -51,7 +51,7 @@ pub(crate) fn prepare_launch_settings<R: Runtime>(
     let (cube_dim, tile_size, smem_width, smem_height) = loop {
         let cube_dim = CubeDim::new(client, working_units);
 
-        let tile_size = TileSize::new(cube_dim.x as usize / channels, cube_dim.y as usize, options);
+        let tile_size = TileSize::new(cube_dim.y as usize, cube_dim.x as usize / channels, options);
 
         let (smem_width, smem_height) = match max_shared_memory_bytes {
             Some(max_shared_memory_bytes) => {
@@ -86,7 +86,7 @@ pub(crate) fn prepare_launch_settings<R: Runtime>(
         break (cube_dim, tile_size, smem_width, smem_height);
     };
 
-    let (num_tiles_width, num_tiles_height) = if tile_size.is_row_vector() {
+    let (num_tiles_width, num_tiles_height) = if is_flattened(options) {
         // Calculate the number of tiles needed to cover the output, and dispatch in a 1D grid.
         const MAX_DISPATCH: usize = 65535;
         let total_tiles =
