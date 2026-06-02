@@ -2,11 +2,12 @@
 //!
 //! The forward kernel couples loading the input tile into shared memory with
 //! the subsequent weighted reads, which makes the loading hard to reason about
-//! on its own. [`SharedMemoryReader::new`] and this test kernel share the exact
-//! same loading code ([`load_shared_region`] + [`smem_slot_value`]); the only
-//! difference is the destination — shared memory in production, an output
-//! tensor here. That lets us validate "which input element lands in which slot"
-//! directly against a tiny CPU reference, with no interpolation maths involved.
+//! on its own. This test runs the *real* loading path — it fills an actual
+//! `Shared` tile with [`load_shared_region`] (the same code production uses,
+//! via [`SharedMemoryReader::new`]) — and then, purely as an observation step
+//! outside the interpolate flow, has a single unit copy the whole tile verbatim
+//! into the output. That lets us check "which input element lands in which slot"
+//! against a tiny CPU reference, with no interpolation maths involved.
 
 use cubecl::{TestRuntime, prelude::*, tensor_vector_size_parallel};
 use cubek_interpolate::{components::readers::load_shared_region, routines::SharedMemoryBlueprint};
@@ -14,10 +15,13 @@ use cubek_test_utils::{TestInput, assert_equals_approx};
 
 use super::{build_output_tensor, output_host_f32};
 
-/// Loads a shared-memory region straight into `output`, reusing the production
-/// loading path. `output` is laid out exactly like the shared-memory tile:
-/// NHWC `[1, smem_height, smem_width, channel_groups * vector_size]`, so slot
-/// `i` (in vector units) maps to the same flat index in both.
+/// Fills a real `Shared` tile via the production loading path, then dumps it.
+///
+/// All units cooperatively load the region into shared memory (exactly as the
+/// forward kernel does), sync, and then a single unit copies every slot into
+/// `output`. `output` is laid out exactly like the shared-memory tile — NHWC
+/// `[1, smem_height, smem_width, channel_groups * vector_size]` — so slot `i`
+/// (in vector units) maps to the same flat index in both.
 #[cube(launch_unchecked)]
 fn load_region_kernel<N: Size>(
     input: &Tensor<Vector<f32, N>>,
@@ -31,9 +35,12 @@ fn load_region_kernel<N: Size>(
     let input_width = input.shape(2);
     let vector_size = N::value();
 
-    load_shared_region::<f32, f32, N, Tensor<Vector<f32, N>>>(
+    let smem_size = blueprint.smem_width * blueprint.smem_height * blueprint.channel_groups;
+    let mut smem = Shared::new_slice(smem_size);
+
+    load_shared_region::<f32, f32, N, Shared<[Vector<f32, N>]>>(
         input,
-        output,
+        &mut smem,
         batch,
         input_height,
         input_width,
@@ -42,6 +49,16 @@ fn load_region_kernel<N: Size>(
         vector_size,
         blueprint,
     );
+
+    sync_cube();
+
+    // Apart from the real interpolate flow: a single unit writes the raw tile
+    // contents into the output so the test sees exactly what was loaded.
+    if UNIT_POS == 0 {
+        for i in 0..smem_size {
+            output[i] = smem[i];
+        }
+    }
 }
 
 /// Run the loading kernel for one region and assert it matches a host gather.
