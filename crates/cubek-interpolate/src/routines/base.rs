@@ -138,8 +138,8 @@ fn compute_smem_size(
     let span_width = ((output_tile_size.width() as f64 - 1.0) * scale_width).max(0.0);
 
     // Halo is added half on each side.
-    let smem_height = span_height.ceil() as usize + halo;
-    let smem_width = span_width.ceil() as usize + halo;
+    let smem_height = span_height.ceil() as usize + halo + 1;
+    let smem_width = span_width.ceil() as usize + halo + 1;
 
     (smem_width.max(1), smem_height.max(1))
 }
