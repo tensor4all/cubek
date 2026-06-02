@@ -9,32 +9,28 @@ pub struct TileSize {
 
 impl TileSize {
     pub fn new(height: usize, width: usize, options: InterpolateOptions) -> Self {
-        if is_flattened(options) {
-            return Self { height, width };
-        }
-
         let halo = get_halo(options.mode);
         let area = width * height;
 
-        if area % halo == 0 {
+        if !is_flattened(options) && area % halo == 0 {
             Self {
-                width: area / halo,
                 height: halo,
+                width: area / halo,
             }
         } else {
             Self {
-                width: area,
                 height: 1,
+                width: area,
             }
         }
-    }
-
-    pub fn width(&self) -> usize {
-        self.width
     }
 
     pub fn height(&self) -> usize {
         self.height
+    }
+
+    pub fn width(&self) -> usize {
+        self.width
     }
 }
 

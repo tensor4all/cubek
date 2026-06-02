@@ -27,7 +27,10 @@ pub fn interpolate_launch<R: Runtime>(
         input.shape.len() - 1,
     );
     let bytes_per_element = acc_dtype.size() * vector_size as usize;
-
+    println!(
+        "Vector size: {}, bytes per element: {}",
+        vector_size, bytes_per_element
+    );
     let problem = InterpolateForwardProblem::from_input_output_shapes(
         &input.shape,
         &[output.shape[1], output.shape[2]],
@@ -66,6 +69,8 @@ pub fn interpolate_launch<R: Runtime>(
         settings.channels,
         settings.num_tiles_width * settings.num_tiles_height,
     );
+
+    println!("Launch settings: {:?}", settings);
 
     unsafe {
         interpolate_kernel::launch_unchecked(
