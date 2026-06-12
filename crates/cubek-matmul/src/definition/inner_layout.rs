@@ -57,16 +57,11 @@ impl InnerLayout {
     /// aren't expressible as plain strides, so a standard binding only ever
     /// resolves to a strided variant.
     ///
-    /// Strict: one of the two matrix axes must be unit-stride. A binding that is
-    /// contiguous in neither (a doubly-strided slice) is *not* a plain row/col
-    /// matrix — it's rejected rather than silently labelled row-major, which would
-    /// otherwise feed the vectorized path a buffer whose lines aren't contiguous.
+    /// Strict: one of the two matrix axes must be unit-stride.
     pub fn from_shape_and_strides(
         shape: &[usize],
         strides: &[usize],
     ) -> Result<Self, MatmulSetupError> {
-        // Reuse the canonical strict deduction; CpuGemm rejects quantized inputs
-        // upstream, so no packing scheme reaches here.
         Ok(MatrixLayout::from_shape_and_strides(shape, strides, None)?.into())
     }
 

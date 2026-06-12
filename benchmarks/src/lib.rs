@@ -6,6 +6,7 @@ pub use cubek_convolution::eval::benchmarks as conv2d;
 pub use cubek_fft::eval::benchmarks as fft;
 pub use cubek_interpolate::eval::benchmarks as interpolate;
 pub use cubek_matmul::eval::benchmarks::gemm;
+pub use cubek_matmul::eval::benchmarks::gemm_cpu;
 pub use cubek_matmul::eval::benchmarks::gemv;
 pub use cubek_matmul::eval::benchmarks::quantized_matmul;
 pub use cubek_pool::eval::benchmarks as pool;
@@ -28,6 +29,7 @@ pub fn all() -> &'static [&'static dyn BenchmarkCategory] {
         &crate::conv2d::Category,
         &crate::fft::Category,
         &crate::gemm::Category,
+        &crate::gemm_cpu::Category,
         &crate::gemv::Category,
         &crate::interpolate::Category,
         &crate::memcpy_async::Category,
@@ -50,38 +52,6 @@ pub fn run_category(category: &dyn BenchmarkCategory) {
         for strategy in category.strategies() {
             println!("---- {} / {} ----", strategy.label, problem.label);
             match category.run(&strategy.id, &problem.id, SAMPLES) {
-                Ok(samples) => {
-                    let durations = BenchmarkDurations {
-                        timing_method: category.timing_method(),
-                        durations: samples.durations,
-                    };
-                    println!("{durations}");
-                }
-                Err(err) => println!("error: {err}"),
-            }
-        }
-    }
-}
-
-/// Like [`run_category`] but restricted to the given strategy and problem ids
-/// (matched against the category's catalogue). Use for a focused comparison —
-/// e.g. CpuGemm vs the unit matmuls on a handful of CPU-sized shapes — instead
-/// of the full strategy×problem sweep. Unknown ids and unavailable strategies
-/// print an `error:` line and are skipped, so a GPU-only strategy on a CPU
-/// runtime degrades gracefully rather than aborting the run.
-pub fn run_category_filtered(
-    category: &dyn BenchmarkCategory,
-    strategy_ids: &[&str],
-    problem_ids: &[&str],
-) {
-    use cubecl::benchmark::BenchmarkDurations;
-
-    const SAMPLES: usize = 10;
-
-    for problem_id in problem_ids {
-        for strategy_id in strategy_ids {
-            println!("---- {strategy_id} / {problem_id} ----");
-            match category.run(strategy_id, problem_id, SAMPLES) {
                 Ok(samples) => {
                     if let Some(tflops) = samples.tflops {
                         println!("{tflops:.3} TFLOPS");
