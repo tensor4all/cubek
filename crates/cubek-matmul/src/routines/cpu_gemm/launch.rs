@@ -1,16 +1,4 @@
 //! Launch wiring for the CpuGemm routine.
-//!
-//! CpuGemm does not go through `MatmulArgs`/`Routine`: it builds three tile-DSL
-//! [`Tile`]s straight from the input bindings and launches a kernel whose whole
-//! body is `c.mma(a, b)`. Each operand arrives as a [`WithLayout`] binding carrying
-//! its own [`InnerLayout`] (the layout can't be deduced — tiled layouts aren't
-//! expressible as plain strides), and the layout builds the matching view — so the
-//! same launch handles row-, col-, tiled-, or batch-major inputs.
-//!
-//! Batches broadcast by *axis omission*: each output batch dimension is its own
-//! engine axis `B0, B1, …`, and an operand that broadcasts a dim simply drops that
-//! axis (and its size-1 buffer dim). The whole batch product rides cube-Z (the axes
-//! share the dim); `M→X`, `N→Y`, `K` walks in-cube.
 
 use cubecl::{CubeDim, Runtime, client::ComputeClient, prelude::*};
 use cubek_std::{InputBinding, MatrixLayout};
@@ -24,10 +12,14 @@ use crate::{
         AvailableVectorSizes, InnerLayout, MatmulElems, MatmulProblem, MatmulSetupError,
         broadcast_batches,
     },
-    routines::{BlueprintStrategy, DeviceSettings},
+    routines::{
+        BlueprintStrategy, DeviceSettings,
+        cpu_gemm::{
+            base::{CpuGemmBlueprint, CpuGemmRoutine, K, M, N, batch_axis},
+            kernel::cpu_gemm_kernel,
+        },
+    },
 };
-
-use super::{CpuGemmBlueprint, CpuGemmRoutine, K, M, N, batch_axis, kernel::cpu_gemm_kernel};
 
 /// A binding together with the [`InnerLayout`] that folds its (possibly higher-rank,
 /// tiled) physical shape back to the logical `(batches, rows, cols)`.
@@ -38,19 +30,21 @@ pub struct WithLayout<B> {
 
 impl<R: Runtime> WithLayout<InputBinding<R>> {
     /// Deduce a plain strided layout from the binding's strides. Valid only for
-    /// non-tiled bindings
-    pub fn strided_input(binding: InputBinding<R>) -> Self {
-        let layout = InnerLayout::from_shape_and_strides(binding.shape(), &binding.data().strides);
-        Self { binding, layout }
+    /// non-tiled bindings; errors on a binding contiguous in neither matrix axis.
+    #[allow(clippy::result_large_err)]
+    pub fn strided_input(binding: InputBinding<R>) -> Result<Self, MatmulSetupError> {
+        let layout = InnerLayout::from_shape_and_strides(binding.shape(), &binding.data().strides)?;
+        Ok(Self { binding, layout })
     }
 }
 
 impl<R: Runtime> WithLayout<TensorBinding<R>> {
     /// Deduce a plain strided layout from the binding's strides. Valid only for
-    /// non-tiled bindings.
-    pub fn strided_output(binding: TensorBinding<R>) -> Self {
-        let layout = InnerLayout::from_shape_and_strides(&binding.shape, &binding.strides);
-        Self { binding, layout }
+    /// non-tiled bindings; errors on a binding contiguous in neither matrix axis.
+    #[allow(clippy::result_large_err)]
+    pub fn strided_output(binding: TensorBinding<R>) -> Result<Self, MatmulSetupError> {
+        let layout = InnerLayout::from_shape_and_strides(&binding.shape, &binding.strides)?;
+        Ok(Self { binding, layout })
     }
 }
 

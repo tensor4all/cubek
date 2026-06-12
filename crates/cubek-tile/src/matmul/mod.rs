@@ -27,14 +27,11 @@ pub trait Mma<Lhs: CubePrimitive, Rhs: CubePrimitive>: CubePrimitive {
 impl<E: Numeric, V: Size, L: Size> Mma<Vector<E, L>, Vector<E, V>> for Vector<E, V> {
     fn mma(acc: &mut Tile<Vector<E, V>>, lhs: &Tile<Vector<E, L>>, rhs: &Tile<Vector<E, V>>) {
         let space = comptime!(acc.space.clone());
-        // The output's bounds-check flag, read before borrowing the payload (only the
-        // payload reaches the leaf).
-        let acc_check = comptime!(acc.check);
         let payload = &mut acc.payload;
         match payload {
             Payload::Cmma(d) => d.mma(lhs, rhs),
             Payload::Gmem(g) | Payload::Smem(g) => {
-                mma_register_memory::<E, L, V>(g, lhs, rhs, space, acc_check)
+                mma_register_memory::<E, L, V>(g, lhs, rhs, space)
             }
         }
     }

@@ -63,6 +63,41 @@ pub fn run_category(category: &dyn BenchmarkCategory) {
     }
 }
 
+/// Like [`run_category`] but restricted to the given strategy and problem ids
+/// (matched against the category's catalogue). Use for a focused comparison —
+/// e.g. CpuGemm vs the unit matmuls on a handful of CPU-sized shapes — instead
+/// of the full strategy×problem sweep. Unknown ids and unavailable strategies
+/// print an `error:` line and are skipped, so a GPU-only strategy on a CPU
+/// runtime degrades gracefully rather than aborting the run.
+pub fn run_category_filtered(
+    category: &dyn BenchmarkCategory,
+    strategy_ids: &[&str],
+    problem_ids: &[&str],
+) {
+    use cubecl::benchmark::BenchmarkDurations;
+
+    const SAMPLES: usize = 10;
+
+    for problem_id in problem_ids {
+        for strategy_id in strategy_ids {
+            println!("---- {strategy_id} / {problem_id} ----");
+            match category.run(strategy_id, problem_id, SAMPLES) {
+                Ok(samples) => {
+                    if let Some(tflops) = samples.tflops {
+                        println!("{tflops:.3} TFLOPS");
+                    }
+                    let durations = BenchmarkDurations {
+                        timing_method: category.timing_method(),
+                        durations: samples.durations,
+                    };
+                    println!("{durations}");
+                }
+                Err(err) => println!("error: {err}"),
+            }
+        }
+    }
+}
+
 /// Generate the `fn main()` for a per-category bench file. Pass the category
 /// module name (e.g. `gemm`); the macro resolves to `$crate::gemm::Category`.
 #[macro_export]

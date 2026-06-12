@@ -401,6 +401,61 @@ fn indivisible_inferred() {
     );
 }
 
+/// Matrix-vector (`n = 1`) with the `Inferred` heuristic: `n` is narrower than the SIMD
+/// width, so the tile-size selector must not assume `n >= vw`. Regression for a `select()`
+/// panic when clamping `tile_n` into `[vw, n]` with `n < vw`.
+#[test]
+fn matvec_inferred() {
+    let (batch, m, n, k) = (1, 64, 1, 64);
+    let client = TestRuntime::client(&Default::default());
+    let problem = MatmulProblem::from_parameters(
+        m,
+        n,
+        k,
+        shape![batch],
+        shape![batch],
+        MatrixLayout::RowMajor,
+        MatrixLayout::RowMajor,
+        MatrixLayout::RowMajor,
+        None,
+        None,
+        MatmulElems::from_single_dtype(f32::as_type_native_unchecked()).as_global_elems(),
+        AddressType::U32,
+    );
+    test_matmul_strategy(
+        client,
+        problem,
+        Strategy::CpuGemm(BlueprintStrategy::Inferred(CpuGemmStrategy::default())),
+    );
+}
+
+/// Narrow `n` (smaller than the SIMD width but `> 1`) under the `Inferred` heuristic — the
+/// other side of the `n < vw` boundary, with `n` not a clean vector multiple.
+#[test]
+fn narrow_n_inferred() {
+    let (batch, m, n, k) = (1, 32, 3, 48);
+    let client = TestRuntime::client(&Default::default());
+    let problem = MatmulProblem::from_parameters(
+        m,
+        n,
+        k,
+        shape![batch],
+        shape![batch],
+        MatrixLayout::RowMajor,
+        MatrixLayout::RowMajor,
+        MatrixLayout::RowMajor,
+        None,
+        None,
+        MatmulElems::from_single_dtype(f32::as_type_native_unchecked()).as_global_elems(),
+        AddressType::U32,
+    );
+    test_matmul_strategy(
+        client,
+        problem,
+        Strategy::CpuGemm(BlueprintStrategy::Inferred(CpuGemmStrategy::default())),
+    );
+}
+
 /// `rhs` unbatched (`[1]`) so it broadcasts across all of `lhs`'s batch — `rhs` omits the
 /// batch axis, every cube reads the same matrix. `rhs` row-major exercises broadcast + `N`
 /// vectorization together.

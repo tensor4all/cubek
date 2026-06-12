@@ -96,34 +96,97 @@ impl<T: CubePrimitive> Tile<T> {
         BatchMatrix::new(batches, rows, cols)
     }
 
-    pub fn matrix(&self, i: usize) -> View<'_, T, Coords2d> {
+    pub fn matrix(&self, i: usize) -> Mat<'_, T> {
         let layout = self.batch_matrix(i);
-        self.view().view(layout)
+        match &self.payload {
+            Payload::Gmem(g) | Payload::Smem(g) => g.mat(layout),
+            Payload::Cmma(_) => panic!("Tile::matrix: a cmma fragment has no memory view"),
+        }
     }
 
-    pub fn matrix_mut(&mut self, i: usize) -> ViewMut<'_, T, Coords2d> {
+    pub fn matrix_mut(&mut self, i: usize) -> MatMut<'_, T> {
         let layout = self.batch_matrix(i);
-        self.view_mut().view_mut(layout)
+        match &mut self.payload {
+            Payload::Gmem(g) | Payload::Smem(g) => g.mat_mut(layout),
+            Payload::Cmma(_) => panic!("Tile::matrix_mut: a cmma fragment has no memory view"),
+        }
+    }
+}
+
+/// A [`Tile`]'s `i`-th batch matrix as a 2-D view that carries its own comptime
+/// bounds-check flag, so the leaf reads it without being asked. `check` zeroes reads /
+/// skips writes past the operand's logical bound (the partial-tile overhang); `false`
+/// is the unchecked fast path.
+#[derive(CubeType)]
+pub struct Mat<'a, T: CubePrimitive> {
+    view: View<'a, T, Coords2d>,
+    #[cube(comptime)]
+    check: bool,
+}
+
+#[cube]
+impl<'a, T: CubePrimitive> Mat<'a, T> {
+    pub fn new(view: View<'a, T, Coords2d>, #[comptime] check: bool) -> Self {
+        Mat::<'a, T> { view, check }
+    }
+
+    pub fn read(&self, pos: Coords2d) -> T {
+        if comptime!(self.check) {
+            self.view.read_checked(pos)
+        } else {
+            self.view.read(pos)
+        }
+    }
+
+    pub fn shape(&self) -> Coords2d {
+        self.view.shape()
+    }
+}
+
+/// The mutable twin of [`Mat`]. Its `write` skips the overhang under `check`, matching the
+/// masked reads.
+#[derive(CubeType)]
+pub struct MatMut<'a, T: CubePrimitive> {
+    view: ViewMut<'a, T, Coords2d>,
+    #[cube(comptime)]
+    check: bool,
+}
+
+#[cube]
+impl<'a, T: CubePrimitive> MatMut<'a, T> {
+    pub fn new(view: ViewMut<'a, T, Coords2d>, #[comptime] check: bool) -> Self {
+        MatMut::<'a, T> { view, check }
+    }
+
+    pub fn read(&self, pos: Coords2d) -> T {
+        if comptime!(self.check) {
+            self.view.read_checked(pos)
+        } else {
+            self.view.read(pos)
+        }
+    }
+
+    pub fn write(&mut self, pos: Coords2d, value: T) {
+        if comptime!(self.check) {
+            self.view.write_checked(pos, value);
+        } else {
+            self.view.write(pos, value);
+        }
+    }
+
+    pub fn shape(&self) -> Coords2d {
+        self.view.shape()
     }
 }
 
 #[cube]
-pub fn copy_2d<T: CubePrimitive>(
-    dst: &mut ViewMut<'_, T, Coords2d>,
-    src: &View<'_, T, Coords2d>,
-    #[comptime] checked: bool,
-) {
+pub fn copy_2d<T: CubePrimitive>(dst: &mut MatMut<'_, T>, src: &Mat<'_, T>) {
     let (h, w) = src.shape();
     for i in 0..h {
         for j in 0..w {
-            // `checked` zeroes reads past the source's logical bound (the partial-tile
-            // overhang); the full cell is still written, so the staged buffer is padded.
-            let value = if comptime!(checked) {
-                src.read_checked((i, j))
-            } else {
-                src.read((i, j))
-            };
-            dst.write((i, j), value);
+            // `src` zeroes reads past its logical bound (the partial-tile overhang); the
+            // staged buffer is unchecked, so the full padded cell is still written.
+            dst.write((i, j), src.read((i, j)));
         }
     }
 }

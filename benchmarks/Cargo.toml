@@ -27,6 +27,11 @@ cpu-reference = [
     "cubek-fft/cpu-reference",
     "cubek-reduce/cpu-reference",
 ]
+# Select cubecl's CPU runtime as `TestRuntime`. Without a backend feature flag the
+# selector defaults to `WgpuRuntime` (Metal on macOS) even though `test-runtime` is on,
+# so benches/correctness silently run on the GPU. Enabling exactly `cubecl/cpu` makes the
+# build.rs pick `test_runtime_cpu` → `CpuRuntime`. Run: `cargo bench --features cpu`.
+cpu = ["cubecl/cpu"]
 
 [lib]
 path = "src/lib.rs"
@@ -75,6 +80,10 @@ half = { workspace = true }
 [[bench]]
 harness = false
 name = "gemm"
+
+[[bench]]
+harness = false
+name = "gemm_cpu"
 
 [[bench]]
 harness = false
