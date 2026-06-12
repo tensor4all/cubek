@@ -70,17 +70,6 @@ pub fn launch_ref<R: Runtime>(
         });
     }
 
-    // One element type drives the whole kernel, so the operands must agree.
-    if dtypes.lhs_global != dtypes.rhs_global || dtypes.lhs_global != dtypes.acc_global {
-        return Err({
-            let msg = format!(
-                "CpuGemm requires a single dtype, got lhs:{:?} rhs:{:?} acc:{:?}",
-                dtypes.lhs_global, dtypes.rhs_global, dtypes.acc_global
-            );
-            MatmulSetupError::InvalidConfig(Box::new(msg))
-        });
-    }
-
     // Logical dims from each operand's imposed layout (its physical shape may be a
     // higher-rank tiled buffer). `k` rides lhs's trailing axis, `n` rhs's; the leading
     // dims are each operand's own (possibly broadcast) batch shape.
@@ -163,6 +152,8 @@ pub fn launch_ref<R: Runtime>(
         k,
         blueprint,
         vector_size,
+        dtypes.lhs_global,
+        dtypes.rhs_global,
         dtypes.acc_global,
     );
 
@@ -189,7 +180,9 @@ fn launch_vectorized<R: Runtime>(
     k: usize,
     blueprint: CpuGemmBlueprint,
     v: usize,
-    dtype: StorageType,
+    lhs_dtype: StorageType,
+    rhs_dtype: StorageType,
+    acc_dtype: StorageType,
 ) {
     // Output batch dims that survive (extent > 1)
     let batch: Vec<usize> = (0..out_batches.len())
@@ -284,7 +277,9 @@ fn launch_vectorized<R: Runtime>(
             v,
             check_m || check_n,
         ),
-        dtype,
+        lhs_dtype,
+        rhs_dtype,
+        acc_dtype,
         v,
     );
 }

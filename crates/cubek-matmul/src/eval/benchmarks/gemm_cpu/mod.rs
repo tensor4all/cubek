@@ -1,8 +1,4 @@
-//! Focused CPU GEMM comparison: CpuGemm vs the unit matmuls on a handful of
-//! CPU-sized shapes, plus a masked-vs-maskless forced-tile probe on the one
-//! aligned square. A narrowed view over the [`gemm`](super::gemm) catalogue, so
-//! `run_bench!(gemm_cpu)` runs only the CPU-relevant cells instead of the full
-//! sweep.
+//! Focused CPU GEMM comparison: CpuGemm
 
 use cubek_test_utils::{CatalogEntry, RunSamples};
 

@@ -13,10 +13,10 @@ const UNROLL_BLOCK: usize = 64;
 /// Run the register microkernel over each batch matrix. `mr × nr` are the accumulator's
 /// trailing axes (`nr` in `N`-lines); `kc` is scalar `K`, read off `rhs` (whose `K` is unlined).
 #[cube]
-pub(crate) fn mma_register_memory<E: Numeric, L: Size, V: Size>(
+pub(crate) fn mma_register_memory<E: Numeric, EL: Numeric, ER: Numeric, L: Size, V: Size>(
     acc: &mut MemData<Vector<E, V>>,
-    lhs: &Tile<Vector<E, L>>,
-    rhs: &Tile<Vector<E, V>>,
+    lhs: &Tile<Vector<EL, L>>,
+    rhs: &Tile<Vector<ER, V>>,
     #[comptime] space: Space,
 ) {
     let (mr, nr, kc) = comptime! {
@@ -39,17 +39,17 @@ pub(crate) fn mma_register_memory<E: Numeric, L: Size, V: Size>(
         let l = lhs.matrix(j);
         let r = rhs.matrix(j);
         let mut a = acc.matrix_mut(j, comptime!(space.clone()));
-        mma_register::<E, L, V>(&l, &r, &mut a, mr, nr, kc);
+        mma_register::<E, EL, ER, L, V>(&l, &r, &mut a, mr, nr, kc);
     }
 }
 
 /// The microkernel. The `mr × nr` block of `V`-wide accumulators lives in registers: load once,
 /// run `kc` rank-1 updates ([`outer_product`]), store once. `nr` counts `N`-lines.
 #[cube]
-fn mma_register<E: Numeric, L: Size, V: Size>(
-    lhs: &Mat<'_, Vector<E, L>>,
-    rhs: &Mat<'_, Vector<E, V>>,
-    acc: &mut MatMut<'_, Vector<E, V>>,
+fn mma_register<E: Numeric, EL: Numeric, ER: Numeric, L: Size, V: Size>(
+    lhs: &MaskedView<'_, Vector<EL, L>>,
+    rhs: &MaskedView<'_, Vector<ER, V>>,
+    acc: &mut MaskedViewMut<'_, Vector<E, V>>,
     #[comptime] mr: usize,
     #[comptime] nr: usize,
     #[comptime] kc: usize,
@@ -67,7 +67,7 @@ fn mma_register<E: Numeric, L: Size, V: Size>(
     }
 
     for p in 0..kc {
-        outer_product::<E, L, V>(lhs, rhs, &mut c, p, mr, nr);
+        outer_product::<E, EL, ER, L, V>(lhs, rhs, &mut c, p, mr, nr);
     }
 
     #[unroll(unroll)]
@@ -81,10 +81,11 @@ fn mma_register<E: Numeric, L: Size, V: Size>(
 
 /// One rank-1 update at scalar depth `p`: `c += outer(A[:, p], B[p, :])`. `A[i, p]` is lane
 /// `p % L` of `lhs`'s `(p / L)` `K`-line, broadcast and multiplied by `B`'s `V`-wide lines.
+/// Each operand is read in its own element (`EL`/`ER`) and cast to the accumulate element `E`.
 #[cube]
-fn outer_product<E: Numeric, L: Size, V: Size>(
-    lhs: &Mat<'_, Vector<E, L>>,
-    rhs: &Mat<'_, Vector<E, V>>,
+fn outer_product<E: Numeric, EL: Numeric, ER: Numeric, L: Size, V: Size>(
+    lhs: &MaskedView<'_, Vector<EL, L>>,
+    rhs: &MaskedView<'_, Vector<ER, V>>,
     c: &mut Array<Vector<E, V>>,
     p: usize,
     #[comptime] mr: usize,
@@ -97,13 +98,15 @@ fn outer_product<E: Numeric, L: Size, V: Size>(
     let mut b = Array::<Vector<E, V>>::new(nr);
     #[unroll(unroll)]
     for j in 0..nr {
-        // Reads past the operand's logical bound contribute 0 to the contraction.
-        b[j] = rhs.read((p as u32, j as u32));
+        // Reads past the operand's logical bound contribute 0 to the contraction; `rhs` widens
+        // from `ER` into the accumulate element `E`.
+        b[j] = Vector::<E, V>::cast_from(rhs.read((p as u32, j as u32)));
     }
     #[unroll(unroll)]
     for i in 0..mr {
         let lhs_line = lhs.read((i as u32, (p / l) as u32));
         let scalar = lhs_line.extract(p % l);
+        // Broadcast the `EL` lane across the `V` line and widen into `E` in one cast.
         let a = Vector::<E, V>::cast_from(scalar);
         #[unroll(unroll)]
         for j in 0..nr {

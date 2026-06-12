@@ -1,5 +1,4 @@
-//! The CpuGemm routine: a tile-DSL CPU matmul whose entire kernel body is `c.mma(a, b)`.
-//! Strategy + blueprint, launch wiring, and kernel are co-located here.
+//! The CpuGemm routine
 //!
 //! # Supported layouts
 //!
@@ -14,16 +13,16 @@
 //!   scalar. Only reachable via the direct [`launch_ref`] (a tiled buffer isn't a plain
 //!   strided binding); the [`Strategy`](crate::strategy::Strategy) entry deduces row/col.
 //!
-//! Batches broadcast by axis omission (a size-1 batch dim is dropped). Mixed layouts across
-//! the three operands are fine.
+//! Lhs, rhs, and the accumulator each carry their own element type; the leaf reads every
+//! operand in its native dtype and widens the inputs into the accumulate element, so a
+//! mixed-precision GEMM (e.g. `f16` inputs, `f32` accumulate) runs through the same kernel.
 //!
 //! # Rejected (returns [`MatmulSetupError`])
 //!
 //! - **Quantized inputs** — unsupported.
-//! - **Heterogeneous dtypes** — lhs, rhs, and accumulator must share one element type.
 //! - **Non-contiguous strided bindings** on the [`Strategy`](crate::strategy::Strategy) path
 //!   — a binding contiguous in neither matrix axis is not a plain row/col matrix and is
-//!   rejected by the strided deduction rather than silently mislabelled.
+//!   rejected by the strided deduction
 
 use std::fmt::Display;
 
@@ -35,15 +34,10 @@ use crate::{
     routines::{BlueprintStrategy, DeviceSettings, Routine},
 };
 
-// Matmul's axes — the labels this routine gives the engine's opaque `Axis`. The matrix
-// axes take the low labels (`K` contracted); each output batch dimension becomes its own
-// axis `B0, B1, …` at `batch_axis(i)`, so an operand broadcasts a batch dim simply by
-// omitting that axis (the collapsed single `B` is gone — it would lose the per-dim
-// broadcast structure). `MAX_AXES = 6` caps this at three batch dims.
+// Matmul axes
 pub(crate) const M: Axis = Axis(0);
 pub(crate) const N: Axis = Axis(1);
 pub(crate) const K: Axis = Axis(2);
-
 /// The axis for output batch dimension `i` (outermost is `0`).
 pub(crate) fn batch_axis(i: usize) -> Axis {
     Axis(3 + i as u8)
@@ -64,9 +58,7 @@ pub struct CpuGemmBlueprint {
 }
 
 impl CpuGemmBlueprint {
-    /// Reject a degenerate blueprint. Edge tiles are masked now (the partition walks
-    /// `ceil`, the overhang is bounds-checked), so blocks need not divide their axis —
-    /// only be non-zero.
+    /// Reject a degenerate blueprint.
     #[allow(clippy::result_large_err)]
     pub fn validate(&self, _problem: &MatmulProblem) -> Result<(), MatmulSetupError> {
         if self.tile_m == 0 || self.tile_n == 0 || self.tile_k == 0 {

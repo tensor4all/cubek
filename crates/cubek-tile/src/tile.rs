@@ -361,10 +361,10 @@ impl<T: CubePrimitive> MemData<T> {
         Window::new(self.origin.clone(), self.extent.clone(), self.bound.clone())
     }
 
-    /// Re-view this buffer through `layout` as a [`Mat`], carrying its own `check` flag so
-    /// the leaf masks without being asked.
-    pub(crate) fn mat(&self, layout: BatchMatrix) -> Mat<'_, T> {
-        Mat::new(
+    /// Re-view this buffer through `layout` as a [`MaskedView`], carrying its own `check` flag
+    /// so the leaf masks without being asked.
+    pub(crate) fn masked(&self, layout: BatchMatrix) -> MaskedView<'_, T> {
+        MaskedView::new(
             self.buffer
                 .view(self.base())
                 .view(self.window())
@@ -373,12 +373,12 @@ impl<T: CubePrimitive> MemData<T> {
         )
     }
 
-    /// The mutable twin of [`mat`](MemData::mat).
-    pub(crate) fn mat_mut(&mut self, layout: BatchMatrix) -> MatMut<'_, T> {
+    /// The mutable twin of [`masked`](MemData::masked).
+    pub(crate) fn masked_mut(&mut self, layout: BatchMatrix) -> MaskedViewMut<'_, T> {
         let base = self.base();
         let window = self.window();
         let check = comptime!(self.check);
-        MatMut::new(
+        MaskedViewMut::new(
             self.buffer.view_mut(base).view_mut(window).view_mut(layout),
             check,
         )
@@ -386,7 +386,7 @@ impl<T: CubePrimitive> MemData<T> {
 
     /// The `i`-th batch matrix as a 2-D view. Mirrors [`Tile::matrix_mut`] for callers that
     /// hold the payload rather than the whole tile, so the `space` is passed in.
-    pub(crate) fn matrix_mut(&mut self, i: usize, #[comptime] space: Space) -> MatMut<'_, T> {
+    pub(crate) fn matrix_mut(&mut self, i: usize, #[comptime] space: Space) -> MaskedViewMut<'_, T> {
         let rank = comptime!(space.rank());
         let rows = comptime!(space.extent_at(rank - 2));
         let cols = comptime!(space.extent_at(rank - 1));
@@ -401,7 +401,7 @@ impl<T: CubePrimitive> MemData<T> {
             }
             batches.push((i as u32 / weight) % shape[p]);
         }
-        self.mat_mut(BatchMatrix::new(batches, rows, cols))
+        self.masked_mut(BatchMatrix::new(batches, rows, cols))
     }
 
     /// Window down to `region`: shift the origin by the region's tile coordinate

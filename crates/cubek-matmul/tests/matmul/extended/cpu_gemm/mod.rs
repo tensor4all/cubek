@@ -26,6 +26,57 @@ struct Dims {
     tile_size: usize,
 }
 
+/// Mixed precision: `f16` inputs, `f32` accumulate/output. Each operand reaches the leaf in
+/// its own dtype and the inputs widen into `f32`, so the cast path runs through a real kernel.
+#[test]
+fn mixed_precision_f16_inputs_f32_acc() {
+    let Dims {
+        lhs_batch,
+        rhs_batch,
+        m,
+        n,
+        k,
+        tile_size,
+    } = Dims {
+        lhs_batch: 1,
+        rhs_batch: 1,
+        m: 32,
+        n: 32,
+        k: 64,
+        tile_size: 8,
+    };
+    let client = TestRuntime::client(&Default::default());
+    let elems = MatmulGlobalElems {
+        lhs: half::f16::as_type_native_unchecked().storage_type(),
+        rhs: half::f16::as_type_native_unchecked().storage_type(),
+        out: f32::as_type_native_unchecked().storage_type(),
+    };
+    let problem = MatmulProblem::from_parameters(
+        m,
+        n,
+        k,
+        shape![lhs_batch],
+        shape![rhs_batch],
+        // rhs/out row-major so the vectorized N path carries the cast on `V`-wide lines.
+        MatrixLayout::RowMajor,
+        MatrixLayout::RowMajor,
+        MatrixLayout::RowMajor,
+        None,
+        None,
+        elems,
+        AddressType::U32,
+    );
+    test_matmul_strategy(
+        client,
+        problem,
+        Strategy::CpuGemm(BlueprintStrategy::Forced(CpuGemmBlueprint {
+            tile_m: tile_size,
+            tile_n: tile_size,
+            tile_k: tile_size,
+        })),
+    );
+}
+
 #[test]
 fn very_small_square() {
     let Dims {

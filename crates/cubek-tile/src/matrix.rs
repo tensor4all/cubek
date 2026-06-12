@@ -1,6 +1,7 @@
 //! The 2-D matrix view over a [`Tile`](super::Tile). A tile carries an N-D
 //! [`Space`](super::Space); [`BatchMatrix`] is a [`Layout`] re-viewing it as a plain
 //! [`Coords2d`] matrix by pinning the leading batch axes and exposing the trailing two.
+//! [`MaskedView`] wraps the resulting view with a comptime `check` flag.
 
 use super::*;
 use cubecl::{
@@ -96,18 +97,18 @@ impl<T: CubePrimitive> Tile<T> {
         BatchMatrix::new(batches, rows, cols)
     }
 
-    pub fn matrix(&self, i: usize) -> Mat<'_, T> {
+    pub fn matrix(&self, i: usize) -> MaskedView<'_, T> {
         let layout = self.batch_matrix(i);
         match &self.payload {
-            Payload::Gmem(g) | Payload::Smem(g) => g.mat(layout),
+            Payload::Gmem(g) | Payload::Smem(g) => g.masked(layout),
             Payload::Cmma(_) => panic!("Tile::matrix: a cmma fragment has no memory view"),
         }
     }
 
-    pub fn matrix_mut(&mut self, i: usize) -> MatMut<'_, T> {
+    pub fn matrix_mut(&mut self, i: usize) -> MaskedViewMut<'_, T> {
         let layout = self.batch_matrix(i);
         match &mut self.payload {
-            Payload::Gmem(g) | Payload::Smem(g) => g.mat_mut(layout),
+            Payload::Gmem(g) | Payload::Smem(g) => g.masked_mut(layout),
             Payload::Cmma(_) => panic!("Tile::matrix_mut: a cmma fragment has no memory view"),
         }
     }
@@ -118,16 +119,16 @@ impl<T: CubePrimitive> Tile<T> {
 /// skips writes past the operand's logical bound (the partial-tile overhang); `false`
 /// is the unchecked fast path.
 #[derive(CubeType)]
-pub struct Mat<'a, T: CubePrimitive> {
+pub struct MaskedView<'a, T: CubePrimitive> {
     view: View<'a, T, Coords2d>,
     #[cube(comptime)]
     check: bool,
 }
 
 #[cube]
-impl<'a, T: CubePrimitive> Mat<'a, T> {
+impl<'a, T: CubePrimitive> MaskedView<'a, T> {
     pub fn new(view: View<'a, T, Coords2d>, #[comptime] check: bool) -> Self {
-        Mat::<'a, T> { view, check }
+        MaskedView::<'a, T> { view, check }
     }
 
     pub fn read(&self, pos: Coords2d) -> T {
@@ -143,19 +144,19 @@ impl<'a, T: CubePrimitive> Mat<'a, T> {
     }
 }
 
-/// The mutable twin of [`Mat`]. Its `write` skips the overhang under `check`, matching the
-/// masked reads.
+/// The mutable twin of [`MaskedView`]. Its `write` skips the overhang under `check`, matching
+/// the masked reads.
 #[derive(CubeType)]
-pub struct MatMut<'a, T: CubePrimitive> {
+pub struct MaskedViewMut<'a, T: CubePrimitive> {
     view: ViewMut<'a, T, Coords2d>,
     #[cube(comptime)]
     check: bool,
 }
 
 #[cube]
-impl<'a, T: CubePrimitive> MatMut<'a, T> {
+impl<'a, T: CubePrimitive> MaskedViewMut<'a, T> {
     pub fn new(view: ViewMut<'a, T, Coords2d>, #[comptime] check: bool) -> Self {
-        MatMut::<'a, T> { view, check }
+        MaskedViewMut::<'a, T> { view, check }
     }
 
     pub fn read(&self, pos: Coords2d) -> T {
@@ -180,7 +181,7 @@ impl<'a, T: CubePrimitive> MatMut<'a, T> {
 }
 
 #[cube]
-pub fn copy_2d<T: CubePrimitive>(dst: &mut MatMut<'_, T>, src: &Mat<'_, T>) {
+pub fn copy_2d<T: CubePrimitive>(dst: &mut MaskedViewMut<'_, T>, src: &MaskedView<'_, T>) {
     let (h, w) = src.shape();
     for i in 0..h {
         for j in 0..w {
