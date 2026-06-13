@@ -7,6 +7,7 @@ pub mod extended;
 pub mod full;
 
 mod bias;
+mod complex;
 pub(crate) mod launcher_strategy;
 
 pub(crate) use launcher_strategy::test_matmul_strategy;

@@ -28,6 +28,7 @@ bytemuck = { workspace = true }
 cubecl = { workspace = true, features = ["stdlib"] }
 cubecl-common = { workspace = true }
 half = { workspace = true, features = ["bytemuck"] }
+num-complex = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]

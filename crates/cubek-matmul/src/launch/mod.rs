@@ -7,12 +7,14 @@ pub mod test_only;
 
 mod args;
 mod base;
+mod complex;
 mod select_kernel;
 mod strategy;
 mod tune_key;
 
 pub use args::*;
 pub use base::*;
+pub use complex::*;
 pub use select_kernel::*;
 pub use strategy::*;
 pub use tune_key::*;
