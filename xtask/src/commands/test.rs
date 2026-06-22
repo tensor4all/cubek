@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use tracel_xtask::prelude::*;
 
 #[macros::extend_command_args(TestCmdArgs, Target, TestSubCommand)]
@@ -8,11 +10,12 @@ pub struct CubeKTestCmdArgs {
 }
 
 pub(crate) fn handle_command(
-    _args: CubeKTestCmdArgs,
+    args: CubeKTestCmdArgs,
     _env: Environment,
     _context: Context,
 ) -> anyhow::Result<()> {
     let backends: &[&str] = &["cubecl/wgpu"];
+    let envs = args.ci.then(|| HashMap::from([("RUST_TEST_THREADS", "1")]));
     for backend in backends {
         helpers::custom_crates_tests(
             vec![
@@ -23,7 +26,7 @@ pub(crate) fn handle_command(
                 "t4a-cubek-test-utils",
             ],
             vec!["--features", backend],
-            None,
+            envs.clone(),
             None,
             &format!("Test on backend {backend:?}"),
         )?;
