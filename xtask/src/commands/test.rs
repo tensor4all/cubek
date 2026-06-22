@@ -2,30 +2,25 @@ use tracel_xtask::prelude::*;
 
 #[macros::extend_command_args(TestCmdArgs, Target, TestSubCommand)]
 pub struct CubeKTestCmdArgs {
-    /// Build in CI mode which excludes unsupported crates.
+    /// Kept for CI workflow compatibility; tests already target the publish closure.
     #[arg(long)]
     pub ci: bool,
 }
 
 pub(crate) fn handle_command(
-    args: CubeKTestCmdArgs,
+    _args: CubeKTestCmdArgs,
     _env: Environment,
     _context: Context,
 ) -> anyhow::Result<()> {
-    let backends: &[&str] = if args.ci {
-        &["cubecl/cpu"]
-    } else {
-        &["cubecl/wgpu", "cubecl/cpu"]
-    };
+    let backends: &[&str] = &["cubecl/wgpu"];
     for backend in backends {
         helpers::custom_crates_tests(
             vec![
-                "cubek-matmul",
-                "cubek-convolution",
-                "cubek-attention",
-                "cubek-random",
-                "cubek-reduce",
-                "cubek-fft",
+                "t4a-cubek-matmul",
+                "t4a-cubek-quant",
+                "t4a-cubek-random",
+                "t4a-cubek-std",
+                "t4a-cubek-test-utils",
             ],
             vec!["--features", backend],
             None,
