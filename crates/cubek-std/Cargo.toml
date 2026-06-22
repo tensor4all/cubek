@@ -1,13 +1,16 @@
 [package]
 authors = ["louisfd <louisfd94@gmail.com>"]
-description = "CubeK: Standard Library"
+description = "Temporary tensor4all fork of CubeK: Standard Library"
 edition.workspace = true
 license.workspace = true
-name = "cubek-std"
+name = "t4a-cubek-std"
 readme.workspace = true
 rust-version.workspace = true
-repository = "https://github.com/tracel-ai/cubek/tree/main/crates/cubek-std"
+repository = "https://github.com/tensor4all/cubek/tree/main/crates/cubek-std"
 version.workspace = true
+
+[lib]
+name = "cubek_std"
 
 [features]
 default = ["cubecl/default"]
@@ -23,4 +26,4 @@ cubecl-common = { workspace = true }
 half = { workspace = true, features = ["bytemuck"] }
 
 [dev-dependencies]
-cubek-test-utils = { path = "../cubek-test-utils", version = "0.2.0", default-features = false }
+cubek-test-utils = { package = "t4a-cubek-test-utils", path = "../cubek-test-utils", version = "0.2.0", default-features = false }

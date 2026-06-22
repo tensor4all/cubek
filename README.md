@@ -1,3 +1,9 @@
+> **tensor4all temporary fork.** The `t4a-cubek*` crates published from this
+> repository are temporary tensor4all fork packages used by `tenferro-rs` while
+> required CubeK/CubeCL patches are being upstreamed. They are not a replacement
+> for upstream CubeK, and the intent is to return to upstream package names once
+> the needed patches have landed.
+
 <div align="center">
 <img src="https://raw.githubusercontent.com/tracel-ai/cubek/main/assets/image.webp" width="150px"/>
 

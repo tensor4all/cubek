@@ -6,8 +6,9 @@ edition.workspace = true
 keywords = []
 license.workspace = true
 name = "cubek-interpolate"
+publish = false
 readme.workspace = true
-repository = "https://github.com/tracel-ai/cubek/tree/main/crates/cubek-interpolate"
+repository = "https://github.com/tensor4all/cubek/tree/main/crates/cubek-interpolate"
 version.workspace = true
 
 [features]
@@ -24,9 +25,9 @@ cpu-reference = ["dep:cubek-test-utils"]
 cubecl = { workspace = true }
 cubecl-common = { workspace = true }
 thiserror = { workspace = true }
-cubek-test-utils = { path = "./../cubek-test-utils/", version = "0.2.0", default-features = false, optional = true }
+cubek-test-utils = { package = "t4a-cubek-test-utils", path = "./../cubek-test-utils/", version = "0.2.0", default-features = false, optional = true }
 
 [dev-dependencies]
 cubecl = { workspace = true, features = ["test-runtime"] }
 cubek-interpolate = { path = ".", features = ["cpu-reference"] }
-cubek-test-utils = { path = "../cubek-test-utils", version = "0.2.0", default-features = false }
+cubek-test-utils = { package = "t4a-cubek-test-utils", path = "../cubek-test-utils", version = "0.2.0", default-features = false }

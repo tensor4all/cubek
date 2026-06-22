@@ -6,8 +6,9 @@ edition.workspace = true
 keywords = []
 license.workspace = true
 name = "cubek-attention"
+publish = false
 readme.workspace = true
-repository = "https://github.com/tracel-ai/cubek/tree/main/crates/cubek-attention"
+repository = "https://github.com/tensor4all/cubek/tree/main/crates/cubek-attention"
 version.workspace = true
 
 [features]
@@ -23,9 +24,9 @@ cpu-reference = ["dep:cubek-test-utils"]
 [dependencies]
 cubecl = { workspace = true, features = ["stdlib"] }
 cubecl-common = { workspace = true }
-cubek-matmul = { path = "../cubek-matmul", version = "0.2.0", default-features = false }
-cubek-std = { path = "../cubek-std", version = "0.2.0", default-features = false }
-cubek-test-utils = { path = "../cubek-test-utils", version = "0.2.0", default-features = false, optional = true }
+cubek-matmul = { package = "t4a-cubek-matmul", path = "../cubek-matmul", version = "0.2.0", default-features = false }
+cubek-std = { package = "t4a-cubek-std", path = "../cubek-std", version = "0.2.0", default-features = false }
+cubek-test-utils = { package = "t4a-cubek-test-utils", path = "../cubek-test-utils", version = "0.2.0", default-features = false, optional = true }
 
 bytemuck = { workspace = true }
 half = { workspace = true, features = ["bytemuck"] }
@@ -34,6 +35,6 @@ serde = { workspace = true }
 [dev-dependencies]
 cubecl = { workspace = true, features = ["test-runtime"] }
 cubek-attention = { path = ".", features = ["cpu-reference"] }
-cubek-test-utils = { path = "../cubek-test-utils", version = "0.2.0", default-features = false }
+cubek-test-utils = { package = "t4a-cubek-test-utils", path = "../cubek-test-utils", version = "0.2.0", default-features = false }
 pretty_assertions = { workspace = true }
 trybuild = "1"

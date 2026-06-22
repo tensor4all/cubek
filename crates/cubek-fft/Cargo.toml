@@ -6,8 +6,9 @@ edition.workspace = true
 keywords = []
 license.workspace = true
 name = "cubek-fft"
+publish = false
 readme.workspace = true
-repository = "https://github.com/tracel-ai/cubek/tree/main/crates/cubek-fft"
+repository = "https://github.com/tensor4all/cubek/tree/main/crates/cubek-fft"
 version.workspace = true
 
 [features]
@@ -22,7 +23,7 @@ cpu-reference = ["dep:num-complex", "dep:cubek-test-utils"]
 
 [dependencies]
 cubecl = { workspace = true }
-cubek-test-utils = { path = "./../cubek-test-utils/", version = "0.2.0", default-features = false, optional = true }
+cubek-test-utils = { package = "t4a-cubek-test-utils", path = "./../cubek-test-utils/", version = "0.2.0", default-features = false, optional = true }
 num-complex = { workspace = true, optional = true }
 
 [dev-dependencies]
@@ -30,4 +31,4 @@ num-complex = { workspace = true }
 cubecl = { workspace = true, features = ["test-runtime"] }
 cubecl-common = { workspace = true }
 cubek-fft = { path = ".", features = ["cpu-reference"] }
-cubek-test-utils = { path = "./../cubek-test-utils/", version = "0.2.0", default-features = false }
+cubek-test-utils = { package = "t4a-cubek-test-utils", path = "./../cubek-test-utils/", version = "0.2.0", default-features = false }

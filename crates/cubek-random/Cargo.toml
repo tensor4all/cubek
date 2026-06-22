@@ -1,14 +1,17 @@
 [package]
 authors = ["nathanielsimard <nathaniel.simard.42@gmail.com>"]
 categories = ["science", "mathematics", "algorithms"]
-description = "CubeK: Random Number Generation"
+description = "Temporary tensor4all fork of CubeK: Random Number Generation"
 edition.workspace = true
 keywords = []
 license.workspace = true
-name = "cubek-random"
+name = "t4a-cubek-random"
 readme.workspace = true
-repository = "https://github.com/tracel-ai/cubek/tree/main/crates/cubek-random"
+repository = "https://github.com/tensor4all/cubek/tree/main/crates/cubek-random"
 version.workspace = true
+
+[lib]
+name = "cubek_random"
 
 [features]
 default = ["std", "cubecl/default"]

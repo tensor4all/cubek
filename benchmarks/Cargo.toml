@@ -9,8 +9,9 @@ edition.workspace = true
 keywords = []
 license.workspace = true
 name = "benchmarks"
+publish = false
 readme.workspace = true
-repository = "https://github.com/tracel-ai/cubek"
+repository = "https://github.com/tensor4all/cubek"
 version.workspace = true
 
 [features]
@@ -46,7 +47,7 @@ cubek = { path = "../crates/cubek", version = "0.2.0", default-features = false,
 cubek-interpolate = { path = "../crates/cubek-interpolate", version = "0.2.0",features = [
     "cpu-reference",
 ], optional = true }
-cubek-matmul = { path = "../crates/cubek-matmul", version = "0.2.0", features = [
+cubek-matmul = { package = "t4a-cubek-matmul", path = "../crates/cubek-matmul", version = "0.2.0", features = [
     "cpu-reference",
 ], optional = true }
 cubek-attention = { path = "../crates/cubek-attention", version = "0.2.0", features = [
@@ -61,7 +62,7 @@ cubek-fft = { path = "../crates/cubek-fft", version = "0.2.0", features = [
 cubek-reduce = { path = "../crates/cubek-reduce", version = "0.2.0", features = [
     "cpu-reference",
 ], optional = true }
-cubek-test-utils = { path = "../crates/cubek-test-utils", version = "0.2.0" }
+cubek-test-utils = { package = "t4a-cubek-test-utils", path = "../crates/cubek-test-utils", version = "0.2.0" }
 half = { workspace = true }
 
 [[bench]]
