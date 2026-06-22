@@ -4,8 +4,24 @@
 # https://doc.rust-lang.org/cargo/reference/resolver.html#feature-resolver-version-2
 resolver = "2"
 
-members = ["crates/*", "xtask", "benchmarks"]
-exclude = ["crates/.claude"]
+members = [
+    "crates/cubek-matmul",
+    "crates/cubek-quant",
+    "crates/cubek-random",
+    "crates/cubek-std",
+    "crates/cubek-test-utils",
+    "xtask",
+]
+exclude = [
+    "benchmarks",
+    "crates/.claude",
+    "crates/cubek",
+    "crates/cubek-attention",
+    "crates/cubek-convolution",
+    "crates/cubek-fft",
+    "crates/cubek-interpolate",
+    "crates/cubek-reduce",
+]
 
 [workspace.package]
 edition = "2024"
