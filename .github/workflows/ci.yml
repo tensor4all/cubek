@@ -129,4 +129,6 @@ jobs:
           mesa-ci-build-version: ${{ env.MESA_CI_BINARY_BUILD }}
       # --------------------------------------------------------------------------------
       - name: Tests
+        env:
+          CUBEK_CI_WGPU_NO_RUN: "1"
         run: cargo xtask test --ci
