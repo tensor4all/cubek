@@ -2,6 +2,8 @@
 
 use cubecl::prelude::*;
 
+use crate::FftError;
+
 /// Largest power-of-two `n_fft` such that a shared-memory radix-2 butterfly
 /// over `f32` fits in this device's per-cube shared memory.
 ///
@@ -19,6 +21,24 @@ pub(crate) fn max_shared_fft_n<R: Runtime>(client: &ComputeClient<R>) -> usize {
 /// Hardware-reported maximum number of units (threads) per cube.
 pub(crate) fn max_units_per_cube<R: Runtime>(client: &ComputeClient<R>) -> usize {
     client.properties().hardware.max_units_per_cube as usize
+}
+
+/// Reject real transforms whose packed CFFT cannot be factored into two
+/// device-supported shared-memory FFTs.
+pub(crate) fn ensure_packed_cfft_supported<R: Runtime>(
+    client: &ComputeClient<R>,
+    n_fft: usize,
+) -> Result<(), FftError> {
+    let max_shared = max_shared_fft_n(client);
+    let max_packed = max_shared.saturating_mul(max_shared);
+    if n_fft / 2 > max_packed {
+        Err(FftError::FftLengthExceedsDeviceLimit {
+            n_fft,
+            max_n_fft: max_packed.saturating_mul(2),
+        })
+    } else {
+        Ok(())
+    }
 }
 
 fn floor_power_of_two(n: usize) -> usize {
