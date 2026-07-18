@@ -11,7 +11,7 @@ use cubecl::{
 };
 use cubek_test_utils::{RunSamples, StridedLayout, TestInput};
 
-use crate::eval::benchmarks::problem::{FftProblem, FftTransform};
+use crate::eval::benchmarks::problem::{CfftProblem, FftProblem};
 use crate::eval::benchmarks::strategy::FftStrategy;
 use crate::{
     ComplexTensorHandle, FftMode, FftNormalization, cfft_interleaved_launch,
@@ -30,7 +30,7 @@ pub fn bench(
     let bench = FftBench::<f32> {
         shape: problem.shape.clone(),
         mode: problem.mode,
-        transform: problem.transform,
+        transform: TransformKind::Real,
         strategy: *strategy,
         device,
         client,
@@ -46,10 +46,40 @@ pub fn bench(
     Ok(RunSamples::new(durations))
 }
 
+pub fn bench_cfft(
+    strategy: &FftStrategy,
+    problem: &CfftProblem,
+    num_samples: usize,
+) -> Result<RunSamples, String> {
+    let device = <TestRuntime as Runtime>::Device::default();
+    let client = <TestRuntime as Runtime>::client(&device);
+    let bench = FftBench::<f32> {
+        shape: problem.shape.clone(),
+        mode: problem.mode,
+        transform: TransformKind::Complex,
+        strategy: *strategy,
+        device,
+        client,
+        samples: num_samples,
+        _e: PhantomData,
+    };
+    let durations = bench
+        .run(TimingMethod::System)
+        .map_err(|e| format!("benchmark failed: {e}"))?
+        .durations;
+    Ok(RunSamples::new(durations))
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TransformKind {
+    Real,
+    Complex,
+}
+
 struct FftBench<E> {
     shape: Vec<usize>,
     mode: FftMode,
-    transform: FftTransform,
+    transform: TransformKind,
     strategy: FftStrategy,
     device: <TestRuntime as Runtime>::Device,
     client: ComputeClient<TestRuntime>,
@@ -248,7 +278,7 @@ impl<E: Float> Benchmark for FftBench<E> {
 
         let dim = self.shape.len() - 1;
 
-        if self.transform == FftTransform::Complex {
+        if self.transform == TransformKind::Complex {
             return match self.strategy {
                 FftStrategy::Split => FftInput::SplitComplex {
                     client: client.clone(),
@@ -417,7 +447,7 @@ mod tests {
         FftBench {
             shape: vec![1, 8],
             mode,
-            transform: FftTransform::Real,
+            transform: TransformKind::Real,
             strategy: FftStrategy::Interleaved,
             device,
             client,
@@ -443,7 +473,7 @@ mod tests {
     #[test]
     fn cloned_interleaved_cfft_sample_has_fresh_writable_output() {
         let mut bench = interleaved_bench(FftMode::Forward);
-        bench.transform = FftTransform::Complex;
+        bench.transform = TransformKind::Complex;
         let prepared = bench.prepare();
         bench.execute(prepared.clone()).unwrap();
     }

@@ -14,7 +14,7 @@ Use hybrid direct kernels:
 - Kernel loads expose separate real and imaginary scalar views of the interleaved buffer.
 - Existing split shared-memory arrays and split four-step scratch buffers remain unchanged.
 - Final kernel stores write interleaved output directly.
-- No standalone pack or unpack kernel is introduced.
+- No standalone interleaved conversion or scaling kernel is introduced. Large real transforms retain the packed-real algorithm stages required to lower through CFFT.
 
 This avoids extra global-memory passes while limiting changes to the global load/store boundaries. Fully interleaving shared memory and scratch is outside this pull request.
 

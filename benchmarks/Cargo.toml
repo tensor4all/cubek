@@ -122,4 +122,8 @@ name = "fft"
 
 [[bench]]
 harness = false
+name = "cfft"
+
+[[bench]]
+harness = false
 name = "quantized_matmul"
