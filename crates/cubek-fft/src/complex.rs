@@ -57,10 +57,17 @@ impl<R: Runtime> ComplexTensorHandle<R> {
             });
         }
 
-        let offset = {
-            let binding = handle.clone().binding();
-            binding.offset_start.unwrap_or_default()
-        };
+        let offset = handle.offset_start.unwrap_or_default();
+        let offset_end = handle.offset_end.unwrap_or_default();
+        let used_bytes = handle
+            .size()
+            .checked_sub(offset)
+            .and_then(|remaining| remaining.checked_sub(offset_end))
+            .ok_or(FftError::InvalidBufferRange {
+                size: handle.size(),
+                offset_start: offset,
+                offset_end,
+            })?;
         if offset % dtype.size() as u64 != 0 {
             return Err(FftError::MisalignedBuffer {
                 offset,
@@ -69,7 +76,7 @@ impl<R: Runtime> ComplexTensorHandle<R> {
         }
 
         let (scalar_strides, physical_scalar_len) = scalar_layout(&shape, &logical_strides)?;
-        let available = usize::try_from(handle.size_in_used() / dtype.size() as u64)
+        let available = usize::try_from(used_bytes / dtype.size() as u64)
             .map_err(|_| FftError::SizeOverflow)?;
         if available < physical_scalar_len {
             return Err(FftError::InsufficientBuffer {
@@ -248,5 +255,19 @@ mod tests {
             Err(FftError::OverlappingBindings)
         ));
         assert_eq!(input.size_in_used(), 4 * dtype.size() as u64);
+    }
+
+    #[test]
+    fn invalid_handle_offset_range_returns_an_error_without_panicking() {
+        let client = <TestRuntime as Runtime>::client(&Default::default());
+        let dtype = f32::as_type_native_unchecked().storage_type();
+        let handle = client
+            .empty(4 * dtype.size())
+            .offset_start(12)
+            .offset_end(8);
+
+        let result = ComplexTensorHandle::<TestRuntime>::new_contiguous(vec![1], handle, dtype);
+
+        assert!(matches!(result, Err(FftError::InvalidBufferRange { .. })));
     }
 }

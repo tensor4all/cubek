@@ -13,6 +13,8 @@ pub enum FftError {
     AxisOutOfBounds { dim: usize, rank: usize },
     #[error("FFT length must be a power of two and at least 2, got {n_fft}")]
     InvalidFftLength { n_fft: usize },
+    #[error("FFT length {n_fft} exceeds this device's supported maximum {max_n_fft}")]
+    FftLengthExceedsDeviceLimit { n_fft: usize, max_n_fft: usize },
     #[error("{name}={value} is outside {min}..={max}")]
     InvalidLength {
         name: &'static str,
@@ -24,6 +26,14 @@ pub enum FftError {
     InsufficientBuffer { required: usize, available: usize },
     #[error("complex buffer byte offset {offset} is not aligned to scalar size {scalar_size}")]
     MisalignedBuffer { offset: u64, scalar_size: usize },
+    #[error(
+        "complex buffer offsets ({offset_start} from start, {offset_end} from end) exceed allocation size {size}"
+    )]
+    InvalidBufferRange {
+        size: u64,
+        offset_start: u64,
+        offset_end: u64,
+    },
     #[error("complex scalar stride at axis {axis} overflowed")]
     StrideOverflow { axis: usize },
     #[error("complex buffer extent overflowed")]

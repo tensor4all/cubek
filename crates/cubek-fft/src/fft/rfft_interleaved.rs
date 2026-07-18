@@ -10,7 +10,7 @@ use crate::{
     fft::{
         FftMode,
         fft_parallel::{bit_reverse, fft_butterfly_parallel},
-        limits::{max_shared_fft_n, max_units_per_cube},
+        limits::{ensure_packed_cfft_supported, max_shared_fft_n, max_units_per_cube},
         rfft_large::rfft_interleaved_large_launch,
     },
     interleaved_layout::InterleavedBatchSignalLayout,
@@ -28,6 +28,7 @@ pub fn rfft_interleaved<R: Runtime>(
     normalization.scale_f32(n_fft)?;
 
     let client = R::client(&Default::default());
+    ensure_packed_cfft_supported(&client, n_fft)?;
     let mut spectrum_shape = shape;
     spectrum_shape[dim] = n_fft / 2 + 1;
     let spectrum = ComplexTensorHandle::empty(&client, spectrum_shape, signal.dtype)?;
@@ -66,6 +67,7 @@ pub fn rfft_interleaved_launch_padded<R: Runtime>(
 ) -> Result<(), FftError> {
     let plan = rfft_plan(signal, &spectrum, dim, signal_len)?;
     normalization.scale_f32(plan.n_fft)?;
+    ensure_packed_cfft_supported(client, plan.n_fft)?;
 
     spectrum.ensure_unique_output()?;
     if plan.count == 0 {

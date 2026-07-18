@@ -11,7 +11,7 @@ use crate::{
     fft::{
         FftMode,
         fft_parallel::{bit_reverse, fft_butterfly_parallel},
-        limits::{max_shared_fft_n, max_units_per_cube},
+        limits::{ensure_packed_cfft_supported, max_shared_fft_n, max_units_per_cube},
         rfft_large::irfft_interleaved_large_launch,
     },
     interleaved_layout::InterleavedBatchSignalLayout,
@@ -34,6 +34,7 @@ pub fn irfft_interleaved<R: Runtime>(
         .checked_sub(1)
         .and_then(|n| n.checked_mul(2))
         .ok_or(FftError::SizeOverflow)?;
+    ensure_packed_cfft_supported(&client, n_fft)?;
     let mut signal_shape = spectrum_shape.to_vec();
     signal_shape[dim] = n_fft;
     irfft_plan(
@@ -87,6 +88,7 @@ pub fn irfft_interleaved_launch_padded<R: Runtime>(
     normalization: FftNormalization,
 ) -> Result<(), FftError> {
     let plan = irfft_plan(&spectrum, signal.shape(), signal.dtype, dim, spec_bins)?;
+    ensure_packed_cfft_supported(client, plan.n_fft)?;
     ensure_non_overlapping_output_layout(signal.shape(), signal.strides())?;
     ensure_unique_output(signal)?;
     if plan.count == 0 {

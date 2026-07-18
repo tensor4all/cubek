@@ -1,5 +1,8 @@
-use cubecl::{Runtime, TestRuntime, frontend::CubePrimitive};
-use cubek_fft::{ComplexTensorHandle, FftError, FftNormalization};
+use cubecl::{Runtime, TestRuntime, frontend::CubePrimitive, std::tensor::TensorHandle};
+use cubek_fft::{
+    ComplexTensorHandle, FftError, FftNormalization, irfft_interleaved, irfft_interleaved_launch,
+    rfft_interleaved, rfft_interleaved_launch,
+};
 
 #[test]
 fn contiguous_c32_uses_two_adjacent_scalars_per_logical_element() {
@@ -100,4 +103,70 @@ fn non_contiguous_c32_extent_includes_the_last_imaginary_scalar() {
     .unwrap();
     assert_eq!(complex.scalar_strides(), &[10, 2]);
     assert_eq!(complex.physical_scalar_len(), 16);
+}
+
+fn first_unsupported_real_fft_n() -> usize {
+    let client = <TestRuntime as Runtime>::client(&Default::default());
+    let max_elems =
+        client.properties().hardware.max_shared_memory_size / (2 * core::mem::size_of::<f32>());
+    let max_shared = if max_elems.is_power_of_two() {
+        max_elems
+    } else {
+        max_elems.next_power_of_two() >> 1
+    };
+    max_shared.saturating_mul(max_shared).saturating_mul(4)
+}
+
+#[test]
+fn oversized_rfft_is_rejected_for_allocating_and_caller_owned_apis_without_allocating_data() {
+    let client = <TestRuntime as Runtime>::client(&Default::default());
+    let dtype = f32::as_type_native_unchecked().storage_type();
+    let n_fft = first_unsupported_real_fft_n();
+    let signal = TensorHandle::new_contiguous(vec![0, n_fft], client.empty(0), dtype);
+
+    assert!(matches!(
+        rfft_interleaved(signal.clone(), 1, FftNormalization::None),
+        Err(FftError::FftLengthExceedsDeviceLimit { .. })
+    ));
+
+    let spectrum =
+        ComplexTensorHandle::new_contiguous(vec![0, n_fft / 2 + 1], client.empty(0), dtype)
+            .unwrap();
+    assert!(matches!(
+        rfft_interleaved_launch(
+            &client,
+            &signal,
+            spectrum.binding(),
+            1,
+            FftNormalization::None,
+        ),
+        Err(FftError::FftLengthExceedsDeviceLimit { .. })
+    ));
+}
+
+#[test]
+fn oversized_irfft_is_rejected_for_allocating_and_caller_owned_apis_without_allocating_data() {
+    let client = <TestRuntime as Runtime>::client(&Default::default());
+    let dtype = f32::as_type_native_unchecked().storage_type();
+    let n_fft = first_unsupported_real_fft_n();
+    let spectrum =
+        ComplexTensorHandle::new_contiguous(vec![0, n_fft / 2 + 1], client.empty(0), dtype)
+            .unwrap();
+
+    assert!(matches!(
+        irfft_interleaved(spectrum.clone(), 1, FftNormalization::ByN),
+        Err(FftError::FftLengthExceedsDeviceLimit { .. })
+    ));
+
+    let signal = TensorHandle::new_contiguous(vec![0, n_fft], client.empty(0), dtype);
+    assert!(matches!(
+        irfft_interleaved_launch(
+            &client,
+            spectrum.binding(),
+            &signal,
+            1,
+            FftNormalization::ByN,
+        ),
+        Err(FftError::FftLengthExceedsDeviceLimit { .. })
+    ));
 }
