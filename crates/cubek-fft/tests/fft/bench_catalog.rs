@@ -25,6 +25,8 @@ fn bench_catalog_exposes_split_and_interleaved_strategies_for_large_problems() {
         .collect::<Vec<_>>();
     assert!(problem_ids.contains(&"forward_1x4096".to_string()));
     assert!(problem_ids.contains(&"inverse_1x8192".to_string()));
+    assert!(problem_ids.contains(&"cfft_forward_1x4096".to_string()));
+    assert!(problem_ids.contains(&"cfft_inverse_1x8192".to_string()));
 }
 
 fn lookup<T>(entries: Vec<CatalogEntry<T>>, id: &str) -> T {
@@ -72,4 +74,34 @@ fn forward_1x4096_default() {
 #[test]
 fn forward_1x16384_default() {
     run("default", "forward_1x16384");
+}
+
+#[test]
+fn forward_1x4096_interleaved() {
+    run("interleaved", "forward_1x4096");
+}
+
+#[test]
+fn inverse_5x2x2048_interleaved() {
+    run("interleaved", "inverse_5x2x2048");
+}
+
+#[test]
+fn cfft_forward_1x4096_default() {
+    run("default", "cfft_forward_1x4096");
+}
+
+#[test]
+fn cfft_forward_1x4096_interleaved() {
+    run("interleaved", "cfft_forward_1x4096");
+}
+
+#[test]
+fn cfft_forward_1x8192_default() {
+    run("default", "cfft_forward_1x8192");
+}
+
+#[test]
+fn cfft_forward_1x8192_interleaved() {
+    run("interleaved", "cfft_forward_1x8192");
 }

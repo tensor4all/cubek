@@ -8,6 +8,12 @@
 //! strides accepted by [`ComplexTensorHandle::new_strided`] are therefore in
 //! logical complex-element units; [`ComplexTensorHandle::scalar_strides`] is
 //! the corresponding physical F32-scalar stride (`2 * logical_stride`).
+//! `num_complex::Complex32` is `#[repr(C)]` with adjacent `re: f32` and
+//! `im: f32` fields, so a contiguous slice has the same bytes as this ABI
+//! when its starting address satisfies `align_of::<Complex32>()` (currently
+//! the same four-byte alignment enforced for F32 offsets). This describes
+//! layout compatibility only; callers must still use a sound ownership-aware
+//! cast or copy when moving between Rust slices and runtime buffers.
 //!
 //! RFFT inputs and IRFFT outputs retain their ordinary real logical shape.
 //! The interleaved RFFT output and IRFFT input use the same logical shape with
@@ -27,9 +33,11 @@
 //! an explicit `ComputeClient` to select a device. This release supports only
 //! F32 real tensors and C32 interleaved tensors. F64/C64 support is deferred.
 //!
-//! Profiling an interleaved launch should show only the selected FFT algorithm
-//! kernels. There is no standalone pack or unpack pass; the implementation
-//! reads and writes the `[re, im]` storage directly.
+//! Profiling an interleaved launch should show no standalone interleaved
+//! conversion or scaling kernel. Large real transforms still use their
+//! algorithmic real-to-packed-CFFT and packed-CFFT-to-real stages internally;
+//! their external complex boundary reads or writes `[re, im]` directly and
+//! final scaling is fused into the existing store.
 
 mod complex;
 mod error;

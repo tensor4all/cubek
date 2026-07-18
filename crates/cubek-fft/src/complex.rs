@@ -68,7 +68,7 @@ impl<R: Runtime> ComplexTensorHandle<R> {
                 offset_start: offset,
                 offset_end,
             })?;
-        if offset % dtype.size() as u64 != 0 {
+        if !offset.is_multiple_of(dtype.size() as u64) {
             return Err(FftError::MisalignedBuffer {
                 offset,
                 scalar_size: dtype.size(),

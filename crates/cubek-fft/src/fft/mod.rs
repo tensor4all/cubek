@@ -1,4 +1,4 @@
-mod cfft;
+pub(crate) mod cfft;
 mod cfft_interleaved;
 mod fft_inner;
 mod fft_parallel;

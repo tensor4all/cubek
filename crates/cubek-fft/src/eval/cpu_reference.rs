@@ -5,7 +5,7 @@
 use std::f32::consts::PI;
 
 use cubecl::{
-    TestRuntime,
+    CubeElement, TestRuntime,
     client::ComputeClient,
     frontend::CubePrimitive,
     zspace::{Shape, Strides},
@@ -16,7 +16,15 @@ use cubek_test_utils::{
 };
 use num_complex::Complex;
 
-use crate::fft::{FftMode, irfft_launch, rfft_launch};
+use crate::{
+    ComplexTensorHandle, FftNormalization,
+    fft::{
+        FftMode,
+        cfft::{CfftBindings, cfft_launch_any_size},
+        cfft_interleaved_launch, irfft_interleaved_launch, irfft_launch, rfft_interleaved_launch,
+        rfft_launch,
+    },
+};
 
 /// Run the FFT kernel for `mode` against the given problem with seeded inputs
 /// and return its output as a [`HostData`].
@@ -110,6 +118,253 @@ pub fn kernel_result(
             }
         }
     }
+}
+
+/// Interleaved C32 counterpart to [`kernel_result`] for benchmark correctness.
+pub fn interleaved_kernel_result(
+    client: ComputeClient<TestRuntime>,
+    shape: Vec<usize>,
+    dim: usize,
+    mode: FftMode,
+    seed_lhs: u64,
+    seed_rhs: u64,
+) -> Result<HostData, String> {
+    let dtype = f32::as_type_native_unchecked().storage_type();
+
+    match mode {
+        FftMode::Forward => {
+            let (signal, _) = TestInput::builder(client.clone(), shape.clone())
+                .dtype(dtype)
+                .uniform(seed_lhs, -1., 1.)
+                .generate_with_f32_host_data();
+            let mut spectrum_shape = shape;
+            spectrum_shape[dim] = spectrum_shape[dim] / 2 + 1;
+            let spectrum = ComplexTensorHandle::empty(&client, spectrum_shape.clone(), dtype)
+                .map_err(|err| err.to_string())?;
+
+            let outcome = launch_and_capture_outcome(&client, |c| {
+                rfft_interleaved_launch(c, &signal, spectrum.binding(), dim, FftNormalization::None)
+                    .into()
+            });
+            match outcome {
+                ExecutionOutcome::CompileError(e) => Err(format!("compile error: {e}")),
+                ExecutionOutcome::Executed => {
+                    Ok(stack_interleaved(&client, spectrum, spectrum_shape))
+                }
+            }
+        }
+        FftMode::Inverse => {
+            let mut spectrum_shape = shape.clone();
+            spectrum_shape[dim] = shape[dim] / 2 + 1;
+            let (_, re) = TestInput::builder(client.clone(), Shape::from(spectrum_shape.clone()))
+                .dtype(dtype)
+                .uniform(seed_lhs, -1., 1.)
+                .generate_with_f32_host_data();
+            let (_, im) = TestInput::builder(client.clone(), Shape::from(spectrum_shape.clone()))
+                .dtype(dtype)
+                .uniform(seed_rhs, -1., 1.)
+                .generate_with_f32_host_data();
+            let mut interleaved = Vec::with_capacity(re.shape.num_elements() * 2);
+            let mut re_values = Vec::with_capacity(re.shape.num_elements());
+            let mut im_values = Vec::with_capacity(im.shape.num_elements());
+            pack_contiguous(
+                &mut re_values,
+                as_f32_slice(&re),
+                &re.strides,
+                &spectrum_shape,
+            );
+            pack_contiguous(
+                &mut im_values,
+                as_f32_slice(&im),
+                &im.strides,
+                &spectrum_shape,
+            );
+            for (re, im) in re_values.into_iter().zip(im_values) {
+                interleaved.extend([re, im]);
+            }
+            let spectrum = ComplexTensorHandle::new_contiguous(
+                spectrum_shape,
+                client.create_from_slice(f32::as_bytes(&interleaved)),
+                dtype,
+            )
+            .map_err(|err| err.to_string())?;
+            let signal = TestInput::builder(client.clone(), Shape::from(shape))
+                .dtype(dtype)
+                .zeros()
+                .generate_without_host_data();
+
+            let outcome = launch_and_capture_outcome(&client, |c| {
+                irfft_interleaved_launch(c, spectrum.binding(), &signal, dim, FftNormalization::ByN)
+                    .into()
+            });
+            match outcome {
+                ExecutionOutcome::CompileError(e) => Err(format!("compile error: {e}")),
+                ExecutionOutcome::Executed => Ok(HostData::from_tensor_handle(
+                    &client,
+                    signal,
+                    HostDataType::F32,
+                )),
+            }
+        }
+    }
+}
+
+/// Run a split or interleaved CFFT benchmark correctness kernel.
+pub fn complex_kernel_result(
+    client: ComputeClient<TestRuntime>,
+    shape: Vec<usize>,
+    dim: usize,
+    mode: FftMode,
+    seed_lhs: u64,
+    seed_rhs: u64,
+    interleaved: bool,
+) -> Result<HostData, String> {
+    let dtype = f32::as_type_native_unchecked().storage_type();
+    let (input_re, _) = TestInput::builder(client.clone(), Shape::from(shape.clone()))
+        .dtype(dtype)
+        .uniform(seed_lhs, -1., 1.)
+        .generate_with_f32_host_data();
+    let (input_im, _) = TestInput::builder(client.clone(), Shape::from(shape.clone()))
+        .dtype(dtype)
+        .uniform(seed_rhs, -1., 1.)
+        .generate_with_f32_host_data();
+
+    if interleaved {
+        let re = HostData::from_tensor_handle(&client, input_re, HostDataType::F32);
+        let im = HostData::from_tensor_handle(&client, input_im, HostDataType::F32);
+        let input = interleave_host_data(&client, &re, &im, shape.clone(), dtype)?;
+        let output = ComplexTensorHandle::empty(&client, shape.clone(), dtype)
+            .map_err(|err| err.to_string())?;
+        let outcome = launch_and_capture_outcome(&client, |c| {
+            cfft_interleaved_launch(
+                c,
+                input.binding(),
+                output.binding(),
+                dim,
+                mode,
+                FftNormalization::None,
+            )
+            .into()
+        });
+        return match outcome {
+            ExecutionOutcome::CompileError(e) => Err(format!("compile error: {e}")),
+            ExecutionOutcome::Executed => Ok(stack_interleaved(&client, output, shape)),
+        };
+    }
+
+    let output_re = TestInput::builder(client.clone(), Shape::from(shape.clone()))
+        .dtype(dtype)
+        .zeros()
+        .generate_without_host_data();
+    let output_im = TestInput::builder(client.clone(), Shape::from(shape))
+        .dtype(dtype)
+        .zeros()
+        .generate_without_host_data();
+    let outcome = launch_and_capture_outcome(&client, |c| {
+        cfft_launch_any_size(
+            c,
+            CfftBindings {
+                input_re: input_re.clone().binding(),
+                input_im: input_im.clone().binding(),
+                output_re: output_re.clone().binding(),
+                output_im: output_im.clone().binding(),
+            },
+            dim,
+            dtype,
+            mode,
+        )
+        .into()
+    });
+    match outcome {
+        ExecutionOutcome::CompileError(e) => Err(format!("compile error: {e}")),
+        ExecutionOutcome::Executed => Ok(stack_re_im(
+            HostData::from_tensor_handle(&client, output_re, HostDataType::F32),
+            HostData::from_tensor_handle(&client, output_im, HostDataType::F32),
+        )),
+    }
+}
+
+/// CPU reference for a complex-to-complex FFT with split seeded inputs.
+pub fn cpu_reference_complex_result(
+    client: ComputeClient<TestRuntime>,
+    shape: Vec<usize>,
+    dim: usize,
+    mode: FftMode,
+    seed_lhs: u64,
+    seed_rhs: u64,
+    progress: Option<&Progress>,
+) -> HostData {
+    let dtype = f32::as_type_native_unchecked().storage_type();
+    let (_, re) = TestInput::builder(client.clone(), Shape::from(shape.clone()))
+        .dtype(dtype)
+        .uniform(seed_lhs, -1., 1.)
+        .generate_with_f32_host_data();
+    let (_, im) = TestInput::builder(client, Shape::from(shape))
+        .dtype(dtype)
+        .uniform(seed_rhs, -1., 1.)
+        .generate_with_f32_host_data();
+    let (re, im) = cfft_ref(&re, &im, dim, mode, progress);
+    stack_re_im(re, im)
+}
+
+fn interleave_host_data(
+    client: &ComputeClient<TestRuntime>,
+    re: &HostData,
+    im: &HostData,
+    shape: Vec<usize>,
+    dtype: cubecl::prelude::StorageType,
+) -> Result<ComplexTensorHandle<TestRuntime>, String> {
+    let mut re_values = Vec::with_capacity(re.shape.num_elements());
+    let mut im_values = Vec::with_capacity(im.shape.num_elements());
+    pack_contiguous(&mut re_values, as_f32_slice(re), &re.strides, &shape);
+    pack_contiguous(&mut im_values, as_f32_slice(im), &im.strides, &shape);
+    let mut values = Vec::with_capacity(re_values.len() * 2);
+    for (re, im) in re_values.into_iter().zip(im_values) {
+        values.extend([re, im]);
+    }
+    ComplexTensorHandle::new_contiguous(
+        shape,
+        client.create_from_slice(f32::as_bytes(&values)),
+        dtype,
+    )
+    .map_err(|err| err.to_string())
+}
+
+fn as_f32_slice(host: &HostData) -> &[f32] {
+    match &host.data {
+        HostDataVec::F32(values) => values,
+        _ => unreachable!("FFT correctness data is always F32"),
+    }
+}
+
+fn stack_interleaved(
+    client: &ComputeClient<TestRuntime>,
+    spectrum: ComplexTensorHandle<TestRuntime>,
+    logical_shape: Vec<usize>,
+) -> HostData {
+    let raw = spectrum.into_raw_parts();
+    let bytes = client.read_one(raw.handle).unwrap();
+    let scalars = f32::from_bytes(&bytes);
+    let mut re = Vec::with_capacity(scalars.len() / 2);
+    let mut im = Vec::with_capacity(scalars.len() / 2);
+    for pair in scalars.chunks_exact(2) {
+        re.push(pair[0]);
+        im.push(pair[1]);
+    }
+    let shape = Shape::from(logical_shape);
+    let strides = StridedLayout::RowMajor.compute_strides(&shape);
+    stack_re_im(
+        HostData {
+            data: HostDataVec::F32(re),
+            shape: shape.clone(),
+            strides: strides.clone(),
+        },
+        HostData {
+            data: HostDataVec::F32(im),
+            shape,
+            strides,
+        },
+    )
 }
 
 /// CPU-only counterpart to [`kernel_result`]: generate the same seeded inputs
@@ -244,6 +499,56 @@ fn fft_recursive(x: &mut [Complex<f32>], fft_mode: FftMode) {
         x[k] = even[k] + t;
         x[k + n / 2] = even[k] - t;
     }
+}
+
+fn cfft_ref(
+    re: &HostData,
+    im: &HostData,
+    dim: usize,
+    mode: FftMode,
+    progress: Option<&Progress>,
+) -> (HostData, HostData) {
+    let shape = re.shape.as_slice();
+    let n_fft = shape[dim];
+    let num_windows = re.shape.num_elements() / n_fft;
+    let strides = StridedLayout::RowMajor.compute_strides(&re.shape);
+    if let Some(progress) = progress {
+        progress.set_total(num_windows as u64);
+    }
+
+    let mut out_re = vec![0.0; re.shape.num_elements()];
+    let mut out_im = vec![0.0; re.shape.num_elements()];
+    for window in 0..num_windows {
+        let mut coords = get_coords(window, shape, dim);
+        let mut values = Vec::with_capacity(n_fft);
+        for i in 0..n_fft {
+            coords[dim] = i;
+            values.push(Complex::new(re.get_f32(&coords), im.get_f32(&coords)));
+        }
+        fft_recursive(&mut values, mode);
+        for (i, value) in values.into_iter().enumerate() {
+            coords[dim] = i;
+            let index = compute_index(&strides, &coords);
+            out_re[index] = value.re;
+            out_im[index] = value.im;
+        }
+        if let Some(progress) = progress {
+            progress.bump();
+        }
+    }
+
+    (
+        HostData {
+            data: HostDataVec::F32(out_re),
+            shape: re.shape.clone(),
+            strides: strides.clone(),
+        },
+        HostData {
+            data: HostDataVec::F32(out_im),
+            shape: re.shape.clone(),
+            strides,
+        },
+    )
 }
 
 /// Reference IRFFT: reconstruct real signal from first n/2 + 1 complex bins.

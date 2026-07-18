@@ -31,7 +31,7 @@ For C32, logical complex element `i` occupies scalar offsets `2 * i` and `2 * i 
 
 Constructors validate rank, shape/stride rank agreement, offset and extent arithmetic, scalar alignment, and that the physical buffer covers the final reachable real/imaginary scalar. Contiguous allocation uses exactly `2 * logical_element_count * sizeof(f32)` bytes. Binding construction is fallible and never silently changes dtype or shape.
 
-The representation must be byte-compatible with contiguous Rust `num_complex::Complex32` slices. The crate does not add a general CubeCL complex scalar type.
+`num_complex::Complex32` is `#[repr(C)]` with adjacent `re: f32` and `im: f32` fields. A contiguous slice therefore has the same byte layout as a contiguous C32 buffer when the start address satisfies `align_of::<Complex32>()` (four bytes for the pinned `num-complex` representation). This is a layout statement, not permission to create aliased or otherwise unsound Rust views; callers remain responsible for ownership and valid casting. The crate does not add a general CubeCL complex scalar type.
 
 ## Public FFT APIs
 
@@ -153,7 +153,7 @@ Regression tests also prove that existing split APIs still compile and retain th
 
 ## Benchmarks and documentation
 
-Add interleaved CFFT/RFFT/IRFFT cases to the existing FFT benchmark catalogue. Compare them with the existing split implementation at representative small and four-step sizes. Record kernel count or profiling evidence showing that the interleaved path contains no standalone pack/unpack pass.
+Add interleaved CFFT/RFFT/IRFFT cases to the existing FFT benchmark catalogue. Compare them with the existing split implementation at representative small and four-step sizes. Record kernel count or profiling evidence showing that the interleaved path contains no standalone interleaved conversion or scaling kernel. Large real FFTs still contain the packed-real algorithm stages required to lower through CFFT.
 
 Document:
 

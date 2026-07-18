@@ -7,7 +7,7 @@ mod strategy;
 
 pub use benchmark::bench;
 pub use correctness::FftCorrectness;
-pub use problem::{FftProblem, problems};
+pub use problem::{FftProblem, FftTransform, problems};
 pub use strategy::{FftStrategy, strategies};
 
 use cubek_test_utils::{CatalogEntry, RunSamples};

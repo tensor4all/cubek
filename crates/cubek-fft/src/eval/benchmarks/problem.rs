@@ -2,9 +2,16 @@ use cubek_test_utils::CatalogEntry;
 
 use crate::FftMode;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FftTransform {
+    Real,
+    Complex,
+}
+
 pub struct FftProblem {
     pub shape: Vec<usize>,
     pub mode: FftMode,
+    pub transform: FftTransform,
 }
 
 pub fn problems() -> Vec<CatalogEntry<FftProblem>> {
@@ -15,6 +22,7 @@ pub fn problems() -> Vec<CatalogEntry<FftProblem>> {
             FftProblem {
                 shape: vec![5, 2, 2048],
                 mode: FftMode::Forward,
+                transform: FftTransform::Real,
             },
         ),
         CatalogEntry::new(
@@ -23,6 +31,7 @@ pub fn problems() -> Vec<CatalogEntry<FftProblem>> {
             FftProblem {
                 shape: vec![5, 2, 2048],
                 mode: FftMode::Inverse,
+                transform: FftTransform::Real,
             },
         ),
         CatalogEntry::new(
@@ -31,6 +40,7 @@ pub fn problems() -> Vec<CatalogEntry<FftProblem>> {
             FftProblem {
                 shape: vec![128, 2048],
                 mode: FftMode::Forward,
+                transform: FftTransform::Real,
             },
         ),
         CatalogEntry::new(
@@ -39,6 +49,7 @@ pub fn problems() -> Vec<CatalogEntry<FftProblem>> {
             FftProblem {
                 shape: vec![128, 2048],
                 mode: FftMode::Inverse,
+                transform: FftTransform::Real,
             },
         ),
         CatalogEntry::new(
@@ -47,6 +58,7 @@ pub fn problems() -> Vec<CatalogEntry<FftProblem>> {
             FftProblem {
                 shape: vec![1, 4096],
                 mode: FftMode::Forward,
+                transform: FftTransform::Real,
             },
         ),
         CatalogEntry::new(
@@ -55,6 +67,7 @@ pub fn problems() -> Vec<CatalogEntry<FftProblem>> {
             FftProblem {
                 shape: vec![1, 4096],
                 mode: FftMode::Inverse,
+                transform: FftTransform::Real,
             },
         ),
         CatalogEntry::new(
@@ -63,6 +76,7 @@ pub fn problems() -> Vec<CatalogEntry<FftProblem>> {
             FftProblem {
                 shape: vec![1, 8192],
                 mode: FftMode::Forward,
+                transform: FftTransform::Real,
             },
         ),
         CatalogEntry::new(
@@ -71,6 +85,7 @@ pub fn problems() -> Vec<CatalogEntry<FftProblem>> {
             FftProblem {
                 shape: vec![1, 8192],
                 mode: FftMode::Inverse,
+                transform: FftTransform::Real,
             },
         ),
         CatalogEntry::new(
@@ -79,6 +94,7 @@ pub fn problems() -> Vec<CatalogEntry<FftProblem>> {
             FftProblem {
                 shape: vec![1, 16384],
                 mode: FftMode::Forward,
+                transform: FftTransform::Real,
             },
         ),
         CatalogEntry::new(
@@ -87,6 +103,43 @@ pub fn problems() -> Vec<CatalogEntry<FftProblem>> {
             FftProblem {
                 shape: vec![1, 16384],
                 mode: FftMode::Inverse,
+                transform: FftTransform::Real,
+            },
+        ),
+        CatalogEntry::new(
+            "cfft_forward_1x4096",
+            "CFFT forward (1x4096)",
+            FftProblem {
+                shape: vec![1, 4096],
+                mode: FftMode::Forward,
+                transform: FftTransform::Complex,
+            },
+        ),
+        CatalogEntry::new(
+            "cfft_inverse_1x4096",
+            "CFFT inverse (1x4096)",
+            FftProblem {
+                shape: vec![1, 4096],
+                mode: FftMode::Inverse,
+                transform: FftTransform::Complex,
+            },
+        ),
+        CatalogEntry::new(
+            "cfft_forward_1x8192",
+            "CFFT forward (1x8192)",
+            FftProblem {
+                shape: vec![1, 8192],
+                mode: FftMode::Forward,
+                transform: FftTransform::Complex,
+            },
+        ),
+        CatalogEntry::new(
+            "cfft_inverse_1x8192",
+            "CFFT inverse (1x8192)",
+            FftProblem {
+                shape: vec![1, 8192],
+                mode: FftMode::Inverse,
+                transform: FftTransform::Complex,
             },
         ),
     ]
