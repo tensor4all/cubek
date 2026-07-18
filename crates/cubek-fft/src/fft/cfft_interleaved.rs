@@ -347,9 +347,9 @@ fn cfft_interleaved_shared_kernel<F: Float>(
     );
 
     let scale = match normalization {
-        FftNormalization::None => F::new(1.0),
-        FftNormalization::ByN => F::new(1.0) / F::cast_from(n_fft),
-        FftNormalization::Ortho => F::new(1.0) / F::cast_from(n_fft).sqrt(),
+        FftNormalization::None => F::new(1.0_f32),
+        FftNormalization::ByN => F::new(1.0_f32) / F::cast_from(n_fft),
+        FftNormalization::Ortho => F::new(1.0_f32) / F::cast_from(n_fft).sqrt(),
     };
     {
         let mut output_re = output.view_mut(InterleavedBatchSignalLayout::new(
@@ -487,9 +487,9 @@ fn cfft_interleaved_four_step_transpose_kernel<F: Float>(
     let k1 = inner - k2 * n1;
     let src = k1 * n2 + k2;
     let scale = match normalization {
-        FftNormalization::None => F::new(1.0),
-        FftNormalization::ByN => F::new(1.0) / F::cast_from(n_fft),
-        FftNormalization::Ortho => F::new(1.0) / F::cast_from(n_fft).sqrt(),
+        FftNormalization::None => F::new(1.0_f32),
+        FftNormalization::ByN => F::new(1.0_f32) / F::cast_from(n_fft),
+        FftNormalization::Ortho => F::new(1.0_f32) / F::cast_from(n_fft).sqrt(),
     };
     {
         let mut output_re = output.view_mut(InterleavedBatchSignalLayout::new(

@@ -269,12 +269,12 @@ fn irfft_interleaved_kernel<F: Float>(
         let src_bin = select(k < n_freq, k, n_fft - k);
         let active = src_bin < spec_bins as usize;
         let src_bin = select(active, src_bin, 0);
-        let im_sign = select(k < n_freq, F::new(1.0), F::new(-1.0));
-        shared_re[dst] = select(active, spectrum_re.read_checked(src_bin), F::new(0.0));
+        let im_sign = select(k < n_freq, F::new(1.0_f32), F::new(-1.0_f32));
+        shared_re[dst] = select(active, spectrum_re.read_checked(src_bin), F::new(0.0_f32));
         shared_im[dst] = select(
             active,
             spectrum_im.read_checked(src_bin) * im_sign,
-            F::new(0.0),
+            F::new(0.0_f32),
         );
         k += threads_per_cube;
     }
@@ -290,9 +290,9 @@ fn irfft_interleaved_kernel<F: Float>(
     );
 
     let scale = match normalization {
-        FftNormalization::None => F::new(1.0),
-        FftNormalization::ByN => F::new(1.0) / F::cast_from(n_fft),
-        FftNormalization::Ortho => F::new(1.0) / F::cast_from(n_fft).sqrt(),
+        FftNormalization::None => F::new(1.0_f32),
+        FftNormalization::ByN => F::new(1.0_f32) / F::cast_from(n_fft),
+        FftNormalization::Ortho => F::new(1.0_f32) / F::cast_from(n_fft).sqrt(),
     };
     let mut i = UNIT_POS as usize;
     while i < n_fft {

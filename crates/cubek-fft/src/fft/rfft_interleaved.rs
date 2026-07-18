@@ -274,8 +274,8 @@ fn rfft_interleaved_kernel<F: Float>(
         let j = bit_reverse(i, log2_n);
         let active = i < signal_len as usize;
         let src = select(active, i, 0);
-        shared_re[j] = select(active, signal_view.read_checked(src), F::new(0.0));
-        shared_im[j] = F::new(0.0);
+        shared_re[j] = select(active, signal_view.read_checked(src), F::new(0.0_f32));
+        shared_im[j] = F::new(0.0_f32);
         i += threads_per_cube;
     }
     sync_cube();
@@ -290,9 +290,9 @@ fn rfft_interleaved_kernel<F: Float>(
     );
 
     let scale = match normalization {
-        FftNormalization::None => F::new(1.0),
-        FftNormalization::ByN => F::new(1.0) / F::cast_from(n_fft),
-        FftNormalization::Ortho => F::new(1.0) / F::cast_from(n_fft).sqrt(),
+        FftNormalization::None => F::new(1.0_f32),
+        FftNormalization::ByN => F::new(1.0_f32) / F::cast_from(n_fft),
+        FftNormalization::Ortho => F::new(1.0_f32) / F::cast_from(n_fft).sqrt(),
     };
     let n_freq = comptime![n_fft / 2 + 1];
     {

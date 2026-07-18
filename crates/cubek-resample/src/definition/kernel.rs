@@ -62,7 +62,7 @@ impl Kernel {
         #[comptime] vectorized_axis: usize,
         #[comptime] lane: usize,
     ) -> F {
-        let mut weight = F::new(1.0);
+        let mut weight = F::new(1.0_f32);
 
         #[unroll]
         for axis_idx in 0..comptime!(config.resample_axes.len()) {
@@ -90,7 +90,7 @@ impl Kernel {
 #[cube]
 fn weight_1d<F: Float>(frac: F, #[comptime] kernel: &Kernel) -> F {
     match kernel {
-        Kernel::Uniform { scale } => F::new(1.0) / F::cast_from(*scale),
+        Kernel::Uniform { scale } => F::new(1.0_f32) / F::cast_from(*scale),
         Kernel::Linear => linear_weight::<F>(frac),
         Kernel::Cubic {
             a_numerator,
@@ -104,7 +104,11 @@ fn weight_1d<F: Float>(frac: F, #[comptime] kernel: &Kernel) -> F {
 #[cube]
 fn linear_weight<F: Float>(frac: F) -> F {
     let abs_frac = frac.abs();
-    select(abs_frac < F::new(1.0), F::new(1.0) - abs_frac, F::new(0.0))
+    select(
+        abs_frac < F::new(1.0_f32),
+        F::new(1.0_f32) - abs_frac,
+        F::new(0.0_f32),
+    )
 }
 
 /// Computes the cubic weight for a given fractional position.
@@ -121,15 +125,16 @@ fn cubic_weight<F: Float>(
     let frac3 = frac2 * abs_frac;
 
     // Convolution 1 (|x| <= 1.0)
-    let w1 = (a + F::new(2.0)) * frac3 - (a + F::new(3.0)) * frac2 + F::new(1.0);
+    let w1 = (a + F::new(2.0_f32)) * frac3 - (a + F::new(3.0_f32)) * frac2 + F::new(1.0_f32);
 
     // Convolution 2 (1.0 < |x| <= 2.0)
-    let w2 = a * frac3 - F::new(5.0) * a * frac2 + F::new(8.0) * a * abs_frac - F::new(4.0) * a;
+    let w2 = a * frac3 - F::new(5.0_f32) * a * frac2 + F::new(8.0_f32) * a * abs_frac
+        - F::new(4.0_f32) * a;
 
     select(
-        abs_frac <= F::new(1.0),
+        abs_frac <= F::new(1.0_f32),
         w1,
-        select(abs_frac <= F::new(2.0), w2, F::new(0.0)),
+        select(abs_frac <= F::new(2.0_f32), w2, F::new(0.0_f32)),
     )
 }
 
@@ -139,15 +144,15 @@ fn lanczos_weight<F: Float>(frac: F, #[comptime] lobes: u8) -> F {
     let abs_frac = frac.abs();
     let pi_frac = F::cast_from(core::f32::consts::PI) * frac;
     let denom = (pi_frac * pi_frac) / F::cast_from(lobes);
-    let safe_denom = select(abs_frac < F::new(1e-7), F::new(1.0), denom);
+    let safe_denom = select(abs_frac < F::new(1e-7_f32), F::new(1.0_f32), denom);
 
     select(
-        abs_frac < F::new(1e-7),
-        F::new(1.0),
+        abs_frac < F::new(1e-7_f32),
+        F::new(1.0_f32),
         select(
             abs_frac < F::cast_from(lobes),
             (pi_frac.sin() * (pi_frac / F::cast_from(lobes)).sin()) / safe_denom,
-            F::new(0.0),
+            F::new(0.0_f32),
         ),
     )
 }
