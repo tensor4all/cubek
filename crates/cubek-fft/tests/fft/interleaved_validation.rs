@@ -105,7 +105,7 @@ fn non_contiguous_c32_extent_includes_the_last_imaginary_scalar() {
     assert_eq!(complex.physical_scalar_len(), 16);
 }
 
-fn first_unsupported_real_fft_n() -> usize {
+fn first_unsupported_real_fft_n() -> Option<usize> {
     let client = <TestRuntime as Runtime>::client(&Default::default());
     let max_elems =
         client.properties().hardware.max_shared_memory_size / (2 * core::mem::size_of::<f32>());
@@ -114,14 +114,18 @@ fn first_unsupported_real_fft_n() -> usize {
     } else {
         max_elems.next_power_of_two() >> 1
     };
-    max_shared.saturating_mul(max_shared).saturating_mul(4)
+    max_shared.checked_mul(max_shared)?.checked_mul(4)
 }
 
 #[test]
 fn oversized_rfft_is_rejected_for_allocating_and_caller_owned_apis_without_allocating_data() {
     let client = <TestRuntime as Runtime>::client(&Default::default());
     let dtype = f32::as_type_native_unchecked().storage_type();
-    let n_fft = first_unsupported_real_fft_n();
+    let Some(n_fft) = first_unsupported_real_fft_n() else {
+        // The CPU backend uses system RAM as its shared-memory limit, so its
+        // reported maximum can exceed every FFT length representable by usize.
+        return;
+    };
     let signal = TensorHandle::new_contiguous(vec![0, n_fft], client.empty(0), dtype);
 
     assert!(matches!(
@@ -148,7 +152,11 @@ fn oversized_rfft_is_rejected_for_allocating_and_caller_owned_apis_without_alloc
 fn oversized_irfft_is_rejected_for_allocating_and_caller_owned_apis_without_allocating_data() {
     let client = <TestRuntime as Runtime>::client(&Default::default());
     let dtype = f32::as_type_native_unchecked().storage_type();
-    let n_fft = first_unsupported_real_fft_n();
+    let Some(n_fft) = first_unsupported_real_fft_n() else {
+        // See the RFFT case above: there is no representable unsupported
+        // length to exercise for a backend with a saturating device limit.
+        return;
+    };
     let spectrum =
         ComplexTensorHandle::new_contiguous(vec![0, n_fft / 2 + 1], client.empty(0), dtype)
             .unwrap();

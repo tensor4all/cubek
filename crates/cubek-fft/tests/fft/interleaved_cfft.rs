@@ -103,7 +103,7 @@ fn round_trip(shape: Vec<usize>, dim: usize, normalization: FftNormalization) {
     run_round_trip(&client, shape, dim, normalization, 1e-4);
 }
 
-fn test_max_shared_fft_n(client: &ComputeClient<TestRuntime>) -> usize {
+fn device_max_shared_fft_n(client: &ComputeClient<TestRuntime>) -> usize {
     let max_elems =
         client.properties().hardware.max_shared_memory_size / (2 * core::mem::size_of::<f32>());
     if max_elems.is_power_of_two() {
@@ -113,9 +113,15 @@ fn test_max_shared_fft_n(client: &ComputeClient<TestRuntime>) -> usize {
     }
 }
 
+fn standard_test_shared_fft_n(client: &ComputeClient<TestRuntime>) -> usize {
+    // The CPU backend reports system RAM as its shared-memory limit. Using that
+    // value directly would turn this routine-path test into a multi-gigabyte FFT.
+    device_max_shared_fft_n(client).min(256)
+}
+
 #[cfg(feature = "heavy")]
 fn first_four_step_n(client: &ComputeClient<TestRuntime>) -> usize {
-    2 * test_max_shared_fft_n(client)
+    2 * device_max_shared_fft_n(client)
 }
 
 #[test]
@@ -190,9 +196,9 @@ fn cfft_interleaved_ortho_round_trip() {
 }
 
 #[test]
-fn cfft_interleaved_shared_memory_boundary_round_trip() {
+fn cfft_interleaved_shared_memory_path_round_trip() {
     let client = <TestRuntime as Runtime>::client(&Default::default());
-    let n_fft = test_max_shared_fft_n(&client);
+    let n_fft = standard_test_shared_fft_n(&client);
     run_round_trip(&client, vec![1, n_fft, 1], 1, FftNormalization::ByN, 0.03);
 }
 
