@@ -13,10 +13,13 @@ use cubek_test_utils::{RunSamples, StridedLayout, TestInput};
 
 use crate::eval::benchmarks::problem::FftProblem;
 use crate::eval::benchmarks::strategy::FftStrategy;
-use crate::{FftMode, irfft_launch, rfft_launch};
+use crate::{
+    ComplexTensorHandle, FftMode, FftNormalization, irfft_interleaved_launch, irfft_launch,
+    rfft_interleaved_launch, rfft_launch,
+};
 
 pub fn bench(
-    _strategy: &FftStrategy,
+    strategy: &FftStrategy,
     problem: &FftProblem,
     num_samples: usize,
 ) -> Result<RunSamples, String> {
@@ -26,6 +29,7 @@ pub fn bench(
     let bench = FftBench::<f32> {
         shape: problem.shape.clone(),
         mode: problem.mode,
+        strategy: *strategy,
         device,
         client,
         samples: num_samples,
@@ -43,6 +47,7 @@ pub fn bench(
 struct FftBench<E> {
     shape: Vec<usize>,
     mode: FftMode,
+    strategy: FftStrategy,
     device: <TestRuntime as Runtime>::Device,
     client: ComputeClient<TestRuntime>,
     samples: usize,
@@ -50,10 +55,16 @@ struct FftBench<E> {
 }
 
 #[derive(Clone)]
-struct FftInput {
-    signal: TensorHandle<TestRuntime>,
-    spectrum_re: TensorHandle<TestRuntime>,
-    spectrum_im: TensorHandle<TestRuntime>,
+enum FftInput {
+    Split {
+        signal: TensorHandle<TestRuntime>,
+        spectrum_re: TensorHandle<TestRuntime>,
+        spectrum_im: TensorHandle<TestRuntime>,
+    },
+    Interleaved {
+        signal: TensorHandle<TestRuntime>,
+        spectrum: ComplexTensorHandle<TestRuntime>,
+    },
 }
 
 fn make_uniform(
@@ -77,6 +88,41 @@ fn empty_handle(
     TensorHandle::empty(client, shape, elem)
 }
 
+fn make_interleaved_uniform(
+    client: &ComputeClient<TestRuntime>,
+    shape: Vec<usize>,
+    dtype: StorageType,
+    re_seed: u64,
+    im_seed: u64,
+) -> ComplexTensorHandle<TestRuntime> {
+    let real = TestInput::builder(client.clone(), Shape::from(shape.clone()))
+        .layout(StridedLayout::RowMajor)
+        .dtype(dtype)
+        .uniform(re_seed, 0., 1.)
+        .f32_host_data();
+    let imaginary = TestInput::builder(client.clone(), Shape::from(shape.clone()))
+        .layout(StridedLayout::RowMajor)
+        .dtype(dtype)
+        .uniform(im_seed, 0., 1.)
+        .f32_host_data();
+    let values = real
+        .iter_indexed_f32()
+        .zip(imaginary.iter_indexed_f32())
+        .flat_map(|((_, re), (_, im))| [re, im])
+        .collect();
+
+    let mut physical_shape = shape.clone();
+    let last = physical_shape.len() - 1;
+    physical_shape[last] *= 2;
+    let physical = TestInput::builder(client.clone(), Shape::from(physical_shape))
+        .layout(StridedLayout::RowMajor)
+        .dtype(dtype)
+        .custom(values)
+        .generate_without_host_data();
+    ComplexTensorHandle::new_contiguous(shape, physical.handle, dtype)
+        .expect("benchmark input must use a supported C32 layout")
+}
+
 impl<E: Float> Benchmark for FftBench<E> {
     type Input = FftInput;
     type Output = ();
@@ -90,51 +136,78 @@ impl<E: Float> Benchmark for FftBench<E> {
         let dim = self.shape.len() - 1;
         shape_out[dim] = self.shape[dim] / 2 + 1;
 
-        match self.mode {
-            FftMode::Forward => {
-                let signal = make_uniform(&client, self.shape.clone(), storage, 0);
-                let spectrum_re = empty_handle(&client, shape_out.clone(), elem);
-                let spectrum_im = empty_handle(&client, shape_out, elem);
-                FftInput {
-                    signal,
-                    spectrum_re,
-                    spectrum_im,
-                }
-            }
-            FftMode::Inverse => {
-                let signal = empty_handle(&client, self.shape.clone(), elem);
-                let spectrum_re = make_uniform(&client, shape_out.clone(), storage, 0);
-                let spectrum_im = make_uniform(&client, shape_out, storage, 1);
-                FftInput {
-                    signal,
-                    spectrum_re,
-                    spectrum_im,
-                }
-            }
+        match self.strategy {
+            FftStrategy::Split => match self.mode {
+                FftMode::Forward => FftInput::Split {
+                    signal: make_uniform(&client, self.shape.clone(), storage, 0),
+                    spectrum_re: empty_handle(&client, shape_out.clone(), elem),
+                    spectrum_im: empty_handle(&client, shape_out, elem),
+                },
+                FftMode::Inverse => FftInput::Split {
+                    signal: empty_handle(&client, self.shape.clone(), elem),
+                    spectrum_re: make_uniform(&client, shape_out.clone(), storage, 0),
+                    spectrum_im: make_uniform(&client, shape_out, storage, 1),
+                },
+            },
+            FftStrategy::Interleaved => match self.mode {
+                FftMode::Forward => FftInput::Interleaved {
+                    signal: make_uniform(&client, self.shape.clone(), storage, 0),
+                    spectrum: ComplexTensorHandle::empty(&client, shape_out, storage)
+                        .expect("benchmark output must use a supported C32 layout"),
+                },
+                FftMode::Inverse => FftInput::Interleaved {
+                    signal: empty_handle(&client, self.shape.clone(), elem),
+                    spectrum: make_interleaved_uniform(&client, shape_out, storage, 0, 1),
+                },
+            },
         }
     }
 
     fn execute(&self, input: Self::Input) -> Result<(), String> {
         let dim = self.shape.len() - 1;
-        match self.mode {
-            FftMode::Forward => rfft_launch(
-                &self.client,
-                input.signal.binding(),
-                input.spectrum_re.binding(),
-                input.spectrum_im.binding(),
-                dim,
-                E::as_type_native_unchecked().storage_type(),
-            )
-            .map_err(|err| format!("{err}"))?,
-            FftMode::Inverse => irfft_launch(
-                &self.client,
-                input.spectrum_re.binding(),
-                input.spectrum_im.binding(),
-                input.signal.binding(),
-                dim,
-                E::as_type_native_unchecked().storage_type(),
-            )
-            .map_err(|err| format!("{err}"))?,
+        match input {
+            FftInput::Split {
+                signal,
+                spectrum_re,
+                spectrum_im,
+            } => match self.mode {
+                FftMode::Forward => rfft_launch(
+                    &self.client,
+                    signal.binding(),
+                    spectrum_re.binding(),
+                    spectrum_im.binding(),
+                    dim,
+                    E::as_type_native_unchecked().storage_type(),
+                )
+                .map_err(|err| format!("{err}"))?,
+                FftMode::Inverse => irfft_launch(
+                    &self.client,
+                    spectrum_re.binding(),
+                    spectrum_im.binding(),
+                    signal.binding(),
+                    dim,
+                    E::as_type_native_unchecked().storage_type(),
+                )
+                .map_err(|err| format!("{err}"))?,
+            },
+            FftInput::Interleaved { signal, spectrum } => match self.mode {
+                FftMode::Forward => rfft_interleaved_launch(
+                    &self.client,
+                    &signal,
+                    spectrum.binding(),
+                    dim,
+                    FftNormalization::None,
+                )
+                .map_err(|err| format!("{err}"))?,
+                FftMode::Inverse => irfft_interleaved_launch(
+                    &self.client,
+                    spectrum.binding(),
+                    &signal,
+                    dim,
+                    FftNormalization::None,
+                )
+                .map_err(|err| format!("{err}"))?,
+            },
         }
         Ok(())
     }
@@ -145,8 +218,9 @@ impl<E: Float> Benchmark for FftBench<E> {
 
     fn name(&self) -> String {
         format!(
-            "fft-{}-{:?}-{:?}",
+            "fft-{}-{}-{:?}-{:?}",
             E::as_type_native_unchecked(),
+            self.strategy.id(),
             self.shape,
             self.mode,
         )

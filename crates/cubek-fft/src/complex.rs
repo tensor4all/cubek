@@ -7,6 +7,7 @@ use cubecl::{
 use crate::FftError;
 
 /// A C32 tensor represented as adjacent real and imaginary F32 scalars.
+#[derive(Clone)]
 pub struct ComplexTensorHandle<R: Runtime> {
     tensor: TensorHandle<R>,
     logical_strides: Vec<usize>,

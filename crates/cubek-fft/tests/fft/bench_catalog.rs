@@ -9,6 +9,24 @@ const SEEDS: [u64; 2] = [12, 34];
 /// FFT is f32 round-trip, so we can be tighter than the matmul side.
 const FFT_EPS: f32 = 1e-3;
 
+#[test]
+fn bench_catalog_exposes_split_and_interleaved_strategies_for_large_problems() {
+    use cubek_fft::eval::benchmarks::{problems, strategies};
+
+    let strategy_ids = strategies()
+        .into_iter()
+        .map(|entry| entry.id)
+        .collect::<Vec<_>>();
+    assert_eq!(strategy_ids, ["default", "interleaved"]);
+
+    let problem_ids = problems()
+        .into_iter()
+        .map(|entry| entry.id)
+        .collect::<Vec<_>>();
+    assert!(problem_ids.contains(&"forward_1x4096".to_string()));
+    assert!(problem_ids.contains(&"inverse_1x8192".to_string()));
+}
+
 fn lookup<T>(entries: Vec<CatalogEntry<T>>, id: &str) -> T {
     entries
         .into_iter()
