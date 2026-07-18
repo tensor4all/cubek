@@ -111,7 +111,7 @@ fn run_allocating_case(shape: Vec<usize>, dim: usize, normalization: FftNormaliz
     expected_shape[dim] = (expected_shape[dim] - 1) * 2;
     assert_eq!(signal.shape().as_slice(), expected_shape);
     assert_scalars_approx(
-        &f32::from_bytes(&client.read_one(signal.handle).unwrap()),
+        f32::from_bytes(&client.read_one(signal.handle).unwrap()),
         &expected,
     );
 }
@@ -169,8 +169,8 @@ fn irfft_interleaved_padded_dc_only_matches_materialized_zero_padding() {
         dtype,
     )
     .unwrap();
-    let virtual_signal = real_tensor(&client, signal_shape.clone(), &vec![0.0; 48]);
-    let materialized_signal = real_tensor(&client, signal_shape, &vec![0.0; 48]);
+    let virtual_signal = real_tensor(&client, signal_shape.clone(), &[0.0; 48]);
+    let materialized_signal = real_tensor(&client, signal_shape, &[0.0; 48]);
 
     irfft_interleaved_launch_padded(
         &client,
@@ -191,8 +191,8 @@ fn irfft_interleaved_padded_dc_only_matches_materialized_zero_padding() {
     .unwrap();
 
     assert_scalars_approx(
-        &f32::from_bytes(&client.read_one(virtual_signal.handle).unwrap()),
-        &f32::from_bytes(&client.read_one(materialized_signal.handle).unwrap()),
+        f32::from_bytes(&client.read_one(virtual_signal.handle).unwrap()),
+        f32::from_bytes(&client.read_one(materialized_signal.handle).unwrap()),
     );
 }
 
@@ -319,7 +319,7 @@ fn interleaved_irfft_large_multi_bin_virtual_padding_matches_materialized_zero_p
     .unwrap();
 
     assert_scalars_approx(
-        &f32::from_bytes(&client.read_one(virtual_signal.handle).unwrap()),
-        &f32::from_bytes(&client.read_one(materialized_signal.handle).unwrap()),
+        f32::from_bytes(&client.read_one(virtual_signal.handle).unwrap()),
+        f32::from_bytes(&client.read_one(materialized_signal.handle).unwrap()),
     );
 }

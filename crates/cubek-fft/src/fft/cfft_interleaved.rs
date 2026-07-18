@@ -104,7 +104,7 @@ fn cfft_plan<R: Runtime>(
     validate_fft_shape(shape, dim)?;
     let n_fft = shape[dim];
     let max_n = max_shared_fft_n(client);
-    let max_four_step_n = max_n.checked_mul(max_n).unwrap_or(usize::MAX);
+    let max_four_step_n = max_n.saturating_mul(max_n);
     if n_fft > max_four_step_n {
         return Err(FftError::InvalidFftLength { n_fft });
     }
@@ -165,7 +165,7 @@ fn cfft_interleaved_four_step_launch<R: Runtime>(
     plan: CfftPlan,
 ) -> Result<(), FftError> {
     let max_n = max_shared_fft_n(client);
-    let max_four_step_n = max_n.checked_mul(max_n).unwrap_or(usize::MAX);
+    let max_four_step_n = max_n.saturating_mul(max_n);
     if plan.n_fft > max_four_step_n {
         return Err(FftError::InvalidFftLength { n_fft: plan.n_fft });
     }

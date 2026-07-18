@@ -2,10 +2,13 @@ use cubecl::std::tensor::TensorHandle;
 use cubecl::{CubeElement, Runtime, TestRuntime, client::ComputeClient, frontend::CubePrimitive};
 use cubek_fft::eval::cpu_reference::rfft_ref;
 use cubek_fft::{
-    ComplexTensorHandle, FftError, FftNormalization, irfft_interleaved, rfft_interleaved,
-    rfft_interleaved_launch, rfft_interleaved_launch_padded,
+    ComplexTensorHandle, FftError, FftNormalization, rfft_interleaved, rfft_interleaved_launch,
+    rfft_interleaved_launch_padded,
 };
 use cubek_test_utils::{HostData, HostDataType, HostDataVec};
+
+#[cfg(feature = "heavy")]
+use cubek_fft::irfft_interleaved;
 
 fn real_tensor(
     client: &ComputeClient<TestRuntime>,
