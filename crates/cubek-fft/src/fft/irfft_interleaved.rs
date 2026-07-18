@@ -299,4 +299,5 @@ fn irfft_interleaved_kernel<F: Float>(
         signal_view.write_checked(i, shared_re[i] * scale);
         i += threads_per_cube;
     }
+    sync_cube();
 }
