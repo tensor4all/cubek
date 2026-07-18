@@ -127,20 +127,35 @@ pub struct ComplexTensorBinding<'a, R: Runtime> {
 
 #[allow(dead_code)]
 impl<R: Runtime> ComplexTensorBinding<'_, R> {
+    pub(crate) fn shape(&self) -> &[usize] {
+        self.handle.shape()
+    }
+
+    pub(crate) fn strides(&self) -> &[usize] {
+        self.handle.strides()
+    }
+
+    pub(crate) fn dtype(&self) -> StorageType {
+        self.handle.dtype()
+    }
+
     pub(crate) fn tensor(&self) -> TensorBinding<R> {
         self.handle.tensor.clone().binding()
     }
 
+    pub(crate) fn ensure_unique_output(&self) -> Result<(), FftError> {
+        ensure_unique_output(&self.handle.tensor)
+    }
+
     pub(crate) fn output_tensor(&self) -> Result<TensorBinding<R>, FftError> {
-        ensure_unique_output(&self.handle.tensor)?;
+        self.ensure_unique_output()?;
         Ok(self.tensor())
     }
 }
 
 #[allow(dead_code)]
 pub(crate) fn ensure_unique_output<R: Runtime>(tensor: &TensorHandle<R>) -> Result<(), FftError> {
-    let probe = tensor.handle.clone();
-    if probe.can_mut() {
+    if tensor.can_mut() {
         Ok(())
     } else {
         Err(FftError::OverlappingBindings)

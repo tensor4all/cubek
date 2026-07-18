@@ -1,6 +1,7 @@
 mod complex;
 mod error;
 mod fft;
+mod interleaved_layout;
 mod layout;
 mod normalization;
 
