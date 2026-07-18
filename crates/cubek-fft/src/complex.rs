@@ -139,6 +139,11 @@ impl<R: Runtime> ComplexTensorBinding<'_, R> {
         self.handle.dtype()
     }
 
+    /// Whether two bindings reference the exact same C32 handle and range.
+    pub(crate) fn is_same_tensor(&self, other: &Self) -> bool {
+        core::ptr::eq(self.handle, other.handle)
+    }
+
     pub(crate) fn tensor(&self) -> TensorBinding<R> {
         self.handle.tensor.clone().binding()
     }

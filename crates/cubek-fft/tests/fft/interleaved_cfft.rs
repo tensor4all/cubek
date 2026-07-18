@@ -219,6 +219,23 @@ fn cfft_interleaved_launch_rejects_aliased_output() {
 }
 
 #[test]
+fn cfft_interleaved_launch_rejects_same_tensor_as_input_and_output() {
+    let client = <TestRuntime as Runtime>::client(&Default::default());
+    let tensor = contiguous_c32(&client, vec![8], &values_for(&[8]));
+    assert!(matches!(
+        cfft_interleaved_launch(
+            &client,
+            tensor.binding(),
+            tensor.binding(),
+            0,
+            FftMode::Forward,
+            FftNormalization::None,
+        ),
+        Err(FftError::OverlappingBindings)
+    ));
+}
+
+#[test]
 fn cfft_interleaved_launch_rejects_overlapping_output_layout() {
     let client = <TestRuntime as Runtime>::client(&Default::default());
     let dtype = f32::as_type_native_unchecked().storage_type();

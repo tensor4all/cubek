@@ -66,6 +66,9 @@ pub fn cfft_interleaved_launch<R: Runtime>(
             actual: output.dtype(),
         });
     }
+    if input.is_same_tensor(&output) {
+        return Err(FftError::OverlappingBindings);
+    }
     ensure_non_overlapping_output_layout(output.shape(), output.strides())?;
 
     normalization.scale_f32(plan.n_fft)?;
