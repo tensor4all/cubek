@@ -244,3 +244,82 @@ fn irfft_interleaved_launch_rejects_shared_output_allocation() {
         Err(FftError::OverlappingBindings)
     ));
 }
+
+#[test]
+#[cfg(feature = "heavy")]
+fn interleaved_irfft_large_multi_bin_virtual_padding_matches_materialized_zero_padding() {
+    let client = <TestRuntime as Runtime>::client(&Default::default());
+    let dtype = f32::as_type_native_unchecked().storage_type();
+    let max_elems =
+        client.properties().hardware.max_shared_memory_size / (2 * core::mem::size_of::<f32>());
+    let max_shared_fft_n = if max_elems.is_power_of_two() {
+        max_elems
+    } else {
+        max_elems.next_power_of_two() >> 1
+    };
+    let n_fft = 2 * max_shared_fft_n;
+    let n_freq = n_fft / 2 + 1;
+    let spec_bins = n_freq / 2;
+    let virtual_shape = vec![2, spec_bins, 3];
+    let materialized_shape = vec![2, n_freq, 3];
+    let signal_shape = vec![2, n_fft, 3];
+    let virtual_values = spectrum_values(&virtual_shape);
+    let virtual_spectrum = ComplexTensorHandle::new_contiguous(
+        virtual_shape.clone(),
+        client.create_from_slice(f32::as_bytes(&virtual_values)),
+        dtype,
+    )
+    .unwrap();
+    let mut materialized_values = vec![0.0; materialized_shape.iter().product::<usize>() * 2];
+    for before in 0..virtual_shape[0] {
+        for bin in 0..virtual_shape[1] {
+            for after in 0..virtual_shape[2] {
+                let virtual_offset =
+                    ((before * virtual_shape[1] + bin) * virtual_shape[2] + after) * 2;
+                let materialized_offset =
+                    ((before * materialized_shape[1] + bin) * materialized_shape[2] + after) * 2;
+                materialized_values[materialized_offset..materialized_offset + 2]
+                    .copy_from_slice(&virtual_values[virtual_offset..virtual_offset + 2]);
+            }
+        }
+    }
+    let materialized_spectrum = ComplexTensorHandle::new_contiguous(
+        materialized_shape,
+        client.create_from_slice(f32::as_bytes(&materialized_values)),
+        dtype,
+    )
+    .unwrap();
+    let virtual_signal = real_tensor(
+        &client,
+        signal_shape.clone(),
+        &vec![0.0; signal_shape.iter().product()],
+    );
+    let materialized_signal = real_tensor(
+        &client,
+        signal_shape.clone(),
+        &vec![0.0; signal_shape.iter().product()],
+    );
+
+    irfft_interleaved_launch_padded(
+        &client,
+        virtual_spectrum.binding(),
+        &virtual_signal,
+        1,
+        spec_bins,
+        FftNormalization::Ortho,
+    )
+    .unwrap();
+    irfft_interleaved_launch(
+        &client,
+        materialized_spectrum.binding(),
+        &materialized_signal,
+        1,
+        FftNormalization::Ortho,
+    )
+    .unwrap();
+
+    assert_scalars_approx(
+        &f32::from_bytes(&client.read_one(virtual_signal.handle).unwrap()),
+        &f32::from_bytes(&client.read_one(materialized_signal.handle).unwrap()),
+    );
+}

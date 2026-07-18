@@ -11,6 +11,7 @@ use crate::{
         FftMode,
         fft_parallel::{bit_reverse, fft_butterfly_parallel},
         limits::{max_shared_fft_n, max_units_per_cube},
+        rfft_large::rfft_interleaved_large_launch,
     },
     interleaved_layout::InterleavedBatchSignalLayout,
     layout::BatchSignalLayout,
@@ -27,10 +28,6 @@ pub fn rfft_interleaved<R: Runtime>(
     normalization.scale_f32(n_fft)?;
 
     let client = R::client(&Default::default());
-    if n_fft > max_shared_fft_n(&client) {
-        return Err(FftError::InvalidFftLength { n_fft });
-    }
-
     let mut spectrum_shape = shape;
     spectrum_shape[dim] = n_fft / 2 + 1;
     let spectrum = ComplexTensorHandle::empty(&client, spectrum_shape, signal.dtype)?;
@@ -75,7 +72,16 @@ pub fn rfft_interleaved_launch_padded<R: Runtime>(
         return Ok(());
     }
     if plan.n_fft > max_shared_fft_n(client) {
-        return Err(FftError::InvalidFftLength { n_fft: plan.n_fft });
+        return rfft_interleaved_large_launch(
+            client,
+            signal,
+            spectrum,
+            dim,
+            signal_len,
+            normalization,
+            plan.n_fft,
+            plan.count,
+        );
     }
 
     let log2_n = plan.n_fft.trailing_zeros() as usize;

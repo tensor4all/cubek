@@ -40,10 +40,12 @@ use cubecl::std::tensor::{
 };
 
 use crate::{
+    ComplexTensorBinding, FftError, FftNormalization,
     fft::{
         FftMode,
         cfft::{CfftBindings, cfft_launch_any_size},
     },
+    interleaved_layout::InterleavedBatchSignalLayout,
     layout::BatchSignalLayout,
 };
 
@@ -253,6 +255,181 @@ pub(crate) fn irfft_large_launch<R: Runtime>(
     Ok(())
 }
 
+/// Forward large-`n_fft` RFFT into an interleaved C32 half-spectrum.
+///
+/// Packed CFFT buffers remain split; only the final post-processing pass writes
+/// the interleaved real and imaginary component views.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn rfft_interleaved_large_launch<R: Runtime>(
+    client: &ComputeClient<R>,
+    signal: &TensorHandle<R>,
+    spectrum: ComplexTensorBinding<'_, R>,
+    dim: usize,
+    signal_len: usize,
+    normalization: FftNormalization,
+    n_fft: usize,
+    count: usize,
+) -> Result<(), FftError> {
+    let m = n_fft / 2;
+    let packed_elems = count.checked_mul(m).ok_or(FftError::SizeOverflow)?;
+    let total_u32 = u32::try_from(packed_elems).map_err(|_| FftError::SizeOverflow)?;
+    let signal_len_u32 = u32::try_from(signal_len).map_err(|_| FftError::SizeOverflow)?;
+    let n_freq = m.checked_add(1).ok_or(FftError::SizeOverflow)?;
+    let post_total = count.checked_mul(n_freq).ok_or(FftError::SizeOverflow)?;
+    let post_total_u32 = u32::try_from(post_total).map_err(|_| FftError::SizeOverflow)?;
+    let byte_len = packed_elems
+        .checked_mul(signal.dtype.size())
+        .ok_or(FftError::SizeOverflow)?;
+    let packed_shape = signal
+        .shape()
+        .iter()
+        .enumerate()
+        .map(|(axis, &extent)| if axis == dim { m } else { extent })
+        .collect::<Vec<_>>();
+    let packed_re = TensorHandle::<R>::new_contiguous(
+        packed_shape.clone(),
+        client.empty(byte_len),
+        signal.dtype,
+    );
+    let packed_im =
+        TensorHandle::<R>::new_contiguous(packed_shape, client.empty(byte_len), signal.dtype);
+
+    let cube_dim = CubeDim::new_1d(256);
+    let cube_count = cubecl::calculate_cube_count_elemwise(client, packed_elems, cube_dim);
+    rfft_pack_kernel::launch::<f32, R>(
+        client,
+        cube_count,
+        cube_dim,
+        signal.clone().binding().into_tensor_arg(),
+        packed_re.clone().binding().into_tensor_arg(),
+        packed_im.clone().binding().into_tensor_arg(),
+        total_u32,
+        signal_len_u32,
+        m,
+        dim,
+    );
+
+    cfft_launch_any_size::<R>(
+        client,
+        CfftBindings {
+            input_re: packed_re.clone().binding(),
+            input_im: packed_im.clone().binding(),
+            output_re: packed_re.clone().binding(),
+            output_im: packed_im.clone().binding(),
+        },
+        dim,
+        signal.dtype,
+        FftMode::Forward,
+    )?;
+
+    let cube_count = cubecl::calculate_cube_count_elemwise(client, post_total, cube_dim);
+    rfft_post_interleaved_kernel::launch::<f32, R>(
+        client,
+        cube_count,
+        cube_dim,
+        packed_re.binding().into_tensor_arg(),
+        packed_im.binding().into_tensor_arg(),
+        spectrum.tensor().into_tensor_arg(),
+        post_total_u32,
+        n_fft,
+        m,
+        dim,
+        normalization,
+    );
+    Ok(())
+}
+
+/// Inverse large-`n_fft` RFFT from an interleaved C32 half-spectrum.
+///
+/// The pre-process reads interleaved component views into split packed CFFT
+/// buffers; the unpack fuses the public inverse-normalization adjustment.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn irfft_interleaved_large_launch<R: Runtime>(
+    client: &ComputeClient<R>,
+    spectrum: ComplexTensorBinding<'_, R>,
+    signal: &TensorHandle<R>,
+    dim: usize,
+    spec_bins: usize,
+    normalization: FftNormalization,
+    n_fft: usize,
+    count: usize,
+) -> Result<(), FftError> {
+    let m = n_fft / 2;
+    let packed_elems = count.checked_mul(m).ok_or(FftError::SizeOverflow)?;
+    let total_u32 = u32::try_from(packed_elems).map_err(|_| FftError::SizeOverflow)?;
+    let spec_bins_u32 = u32::try_from(spec_bins).map_err(|_| FftError::SizeOverflow)?;
+    let byte_len = packed_elems
+        .checked_mul(signal.dtype.size())
+        .ok_or(FftError::SizeOverflow)?;
+    let packed_shape = signal
+        .shape()
+        .iter()
+        .enumerate()
+        .map(|(axis, &extent)| if axis == dim { m } else { extent })
+        .collect::<Vec<_>>();
+    let packed_in_re = TensorHandle::<R>::new_contiguous(
+        packed_shape.clone(),
+        client.empty(byte_len),
+        signal.dtype,
+    );
+    let packed_in_im = TensorHandle::<R>::new_contiguous(
+        packed_shape.clone(),
+        client.empty(byte_len),
+        signal.dtype,
+    );
+    let packed_out_re = TensorHandle::<R>::new_contiguous(
+        packed_shape.clone(),
+        client.empty(byte_len),
+        signal.dtype,
+    );
+    let packed_out_im =
+        TensorHandle::<R>::new_contiguous(packed_shape, client.empty(byte_len), signal.dtype);
+
+    let cube_dim = CubeDim::new_1d(256);
+    let cube_count = cubecl::calculate_cube_count_elemwise(client, packed_elems, cube_dim);
+    irfft_pre_interleaved_kernel::launch::<f32, R>(
+        client,
+        cube_count,
+        cube_dim,
+        spectrum.tensor().into_tensor_arg(),
+        packed_in_re.clone().binding().into_tensor_arg(),
+        packed_in_im.clone().binding().into_tensor_arg(),
+        total_u32,
+        spec_bins_u32,
+        n_fft,
+        m,
+        dim,
+    );
+
+    cfft_launch_any_size::<R>(
+        client,
+        CfftBindings {
+            input_re: packed_in_re.binding(),
+            input_im: packed_in_im.binding(),
+            output_re: packed_out_re.clone().binding(),
+            output_im: packed_out_im.clone().binding(),
+        },
+        dim,
+        signal.dtype,
+        FftMode::Inverse,
+    )?;
+
+    let cube_count = cubecl::calculate_cube_count_elemwise(client, packed_elems, cube_dim);
+    irfft_unpack_interleaved_kernel::launch::<f32, R>(
+        client,
+        cube_count,
+        cube_dim,
+        packed_out_re.binding().into_tensor_arg(),
+        packed_out_im.binding().into_tensor_arg(),
+        signal.clone().binding().into_tensor_arg(),
+        total_u32,
+        m,
+        dim,
+        normalization,
+    );
+    Ok(())
+}
+
 // --- pack / post / pre / unpack kernels --------------------------------
 
 /// `y[k] = x[2k] + i * x[2k+1]`, one thread per `k`.
@@ -362,6 +539,70 @@ fn rfft_post_kernel<F: Float>(
     }
 }
 
+/// Interleaved-output variant of `rfft_post_kernel`.
+#[cube(launch)]
+fn rfft_post_interleaved_kernel<F: Float>(
+    packed_re: &Tensor<F>,
+    packed_im: &Tensor<F>,
+    spectrum: &mut Tensor<F>,
+    total: u32,
+    #[comptime] n_fft: usize,
+    #[comptime] m: usize,
+    #[comptime] dim: usize,
+    #[comptime] normalization: FftNormalization,
+) {
+    let pos = ABSOLUTE_POS;
+    if pos >= total as usize {
+        terminate!();
+    }
+    let n_freq = comptime![m + 1];
+    let k = pos % n_freq;
+    let window = pos / n_freq;
+    let packed_re_view = packed_re.view(BatchSignalLayout::new(packed_re, window, dim));
+    let packed_im_view = packed_im.view(BatchSignalLayout::new(packed_im, window, dim));
+    let scale = match normalization {
+        FftNormalization::None => F::new(1.0),
+        FftNormalization::ByN => F::new(1.0) / F::cast_from(n_fft),
+        FftNormalization::Ortho => F::new(1.0) / F::cast_from(n_fft).sqrt(),
+    };
+
+    let (x_re, x_im) = if k == 0 {
+        let y0_re = packed_re_view.read_checked(0);
+        let y0_im = packed_im_view.read_checked(0);
+        (y0_re + y0_im, F::new(0.0))
+    } else if k == m {
+        let y0_re = packed_re_view.read_checked(0);
+        let y0_im = packed_im_view.read_checked(0);
+        (y0_re - y0_im, F::new(0.0))
+    } else {
+        let a_re = packed_re_view.read_checked(k);
+        let a_im = packed_im_view.read_checked(k);
+        let b_re = packed_re_view.read_checked(m - k);
+        let b_im = -packed_im_view.read_checked(m - k);
+        let theta = -F::new(2.0 * PI) * F::cast_from(k) / F::cast_from(n_fft);
+        let c = theta.cos();
+        let s = theta.sin();
+        (
+            F::new(0.5)
+                * (a_re * (F::new(1.0) + s) + a_im * c + b_re * (F::new(1.0) - s) - b_im * c),
+            F::new(0.5)
+                * (a_im * (F::new(1.0) + s) - a_re * c + b_re * c + b_im * (F::new(1.0) - s)),
+        )
+    };
+    {
+        let mut spectrum_re = spectrum.view_mut(InterleavedBatchSignalLayout::new(
+            &*spectrum, window, dim, 0usize,
+        ));
+        spectrum_re.write_checked(k, x_re * scale);
+    }
+    {
+        let mut spectrum_im = spectrum.view_mut(InterleavedBatchSignalLayout::new(
+            &*spectrum, window, dim, 1usize,
+        ));
+        spectrum_im.write_checked(k, x_im * scale);
+    }
+}
+
 /// Build packed `Y[0..M]` from half-spectrum `X[0..N/2+1]` for the
 /// packed-real inverse path. Inverse of `rfft_post_kernel`.
 ///
@@ -446,6 +687,62 @@ fn irfft_pre_kernel<F: Float>(
     }
 }
 
+/// Interleaved-input variant of `irfft_pre_kernel`.
+#[cube(launch)]
+fn irfft_pre_interleaved_kernel<F: Float>(
+    spectrum: &Tensor<F>,
+    packed_re: &mut Tensor<F>,
+    packed_im: &mut Tensor<F>,
+    total: u32,
+    spec_bins: u32,
+    #[comptime] n_fft: usize,
+    #[comptime] m: usize,
+    #[comptime] dim: usize,
+) {
+    let pos = ABSOLUTE_POS;
+    if pos >= total as usize {
+        terminate!();
+    }
+    let k = pos % m;
+    let window = pos / m;
+    let spectrum_re = spectrum.view(InterleavedBatchSignalLayout::new(
+        spectrum, window, dim, 0usize,
+    ));
+    let spectrum_im = spectrum.view(InterleavedBatchSignalLayout::new(
+        spectrum, window, dim, 1usize,
+    ));
+    let mut packed_re_view = packed_re.view_mut(BatchSignalLayout::new(&*packed_re, window, dim));
+    let mut packed_im_view = packed_im.view_mut(BatchSignalLayout::new(&*packed_im, window, dim));
+
+    if k == 0 {
+        let has_nyquist = m < spec_bins as usize;
+        let x0_re = spectrum_re.read_checked(0);
+        let xm = select(has_nyquist, m, 0);
+        let xm_re = select(has_nyquist, spectrum_re.read_checked(xm), F::new(0.0));
+        packed_re_view.write_checked(k, F::new(0.5) * (x0_re + xm_re));
+        packed_im_view.write_checked(k, F::new(0.5) * (x0_re - xm_re));
+    } else {
+        let active = k < spec_bins as usize;
+        let src = select(active, k, 0);
+        let x_re = select(active, spectrum_re.read_checked(src), F::new(0.0));
+        let x_im = select(active, spectrum_im.read_checked(src), F::new(0.0));
+        let mirror = m - k;
+        let mirror_active = mirror < spec_bins as usize;
+        let mirror = select(mirror_active, mirror, 0);
+        let xm_re = select(mirror_active, spectrum_re.read_checked(mirror), F::new(0.0));
+        let xm_im = -select(mirror_active, spectrum_im.read_checked(mirror), F::new(0.0));
+        let theta = F::new(2.0 * PI) * F::cast_from(k) / F::cast_from(n_fft);
+        let c = theta.cos();
+        let s = theta.sin();
+        let y_re = F::new(0.5)
+            * (x_re * (F::new(1.0) - s) - x_im * c + xm_re * (F::new(1.0) + s) + xm_im * c);
+        let y_im = F::new(0.5)
+            * (x_im * (F::new(1.0) - s) + x_re * c - xm_re * c + xm_im * (F::new(1.0) + s));
+        packed_re_view.write_checked(k, y_re);
+        packed_im_view.write_checked(k, y_im);
+    }
+}
+
 /// Unpack `y[k]` into real `x` with the 1/M normalisation folded in.
 /// `x[2k] = Re(y[k]) / M`, `x[2k+1] = Im(y[k]) / M`. One thread per `k`.
 #[cube(launch)]
@@ -467,6 +764,37 @@ fn irfft_unpack_kernel<F: Float>(
     let packed_im_view = packed_im.view(BatchSignalLayout::new(packed_im, window, dim));
     let mut signal_view = signal.view_mut(BatchSignalLayout::new(&*signal, window, dim));
     let scale = F::new(1.0) / F::cast_from(m);
+    signal_view.write_checked(2 * k, packed_re_view.read_checked(k) * scale);
+    signal_view.write_checked(2 * k + 1, packed_im_view.read_checked(k) * scale);
+}
+
+/// Interleaved IRFFT unpack with the public normalization fused into stores.
+#[cube(launch)]
+fn irfft_unpack_interleaved_kernel<F: Float>(
+    packed_re: &Tensor<F>,
+    packed_im: &Tensor<F>,
+    signal: &mut Tensor<F>,
+    total: u32,
+    #[comptime] m: usize,
+    #[comptime] dim: usize,
+    #[comptime] normalization: FftNormalization,
+) {
+    let pos = ABSOLUTE_POS;
+    if pos >= total as usize {
+        terminate!();
+    }
+    let k = pos % m;
+    let window = pos / m;
+    let packed_re_view = packed_re.view(BatchSignalLayout::new(packed_re, window, dim));
+    let packed_im_view = packed_im.view(BatchSignalLayout::new(packed_im, window, dim));
+    let mut signal_view = signal.view_mut(BatchSignalLayout::new(&*signal, window, dim));
+    let n_fft = comptime![2 * m];
+    let adjustment = match normalization {
+        FftNormalization::None => F::cast_from(n_fft),
+        FftNormalization::ByN => F::new(1.0),
+        FftNormalization::Ortho => F::cast_from(n_fft).sqrt(),
+    };
+    let scale = adjustment / F::cast_from(m);
     signal_view.write_checked(2 * k, packed_re_view.read_checked(k) * scale);
     signal_view.write_checked(2 * k + 1, packed_im_view.read_checked(k) * scale);
 }

@@ -12,6 +12,7 @@ use crate::{
         FftMode,
         fft_parallel::{bit_reverse, fft_butterfly_parallel},
         limits::{max_shared_fft_n, max_units_per_cube},
+        rfft_large::irfft_interleaved_large_launch,
     },
     interleaved_layout::InterleavedBatchSignalLayout,
     layout::BatchSignalLayout,
@@ -35,17 +36,13 @@ pub fn irfft_interleaved<R: Runtime>(
         .ok_or(FftError::SizeOverflow)?;
     let mut signal_shape = spectrum_shape.to_vec();
     signal_shape[dim] = n_fft;
-    let plan = irfft_plan(
+    irfft_plan(
         &spectrum.binding(),
         &signal_shape,
         spectrum.dtype(),
         dim,
         n_freq,
     )?;
-    if plan.n_fft > max_shared_fft_n(&client) {
-        return Err(FftError::InvalidFftLength { n_fft: plan.n_fft });
-    }
-
     let elements = signal_shape.iter().try_fold(1usize, |total, extent| {
         total.checked_mul(*extent).ok_or(FftError::SizeOverflow)
     })?;
@@ -96,7 +93,16 @@ pub fn irfft_interleaved_launch_padded<R: Runtime>(
         return Ok(());
     }
     if plan.n_fft > max_shared_fft_n(client) {
-        return Err(FftError::InvalidFftLength { n_fft: plan.n_fft });
+        return irfft_interleaved_large_launch(
+            client,
+            spectrum,
+            signal,
+            dim,
+            spec_bins,
+            normalization,
+            plan.n_fft,
+            plan.count,
+        );
     }
 
     let log2_n = plan.n_fft.trailing_zeros() as usize;
