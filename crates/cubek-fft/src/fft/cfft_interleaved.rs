@@ -1,10 +1,15 @@
+use core::f32::consts::PI;
+
 use cubecl::prelude::*;
-use cubecl::std::tensor::{AsView as _, AsViewExpand, AsViewMut as _, AsViewMutExpand};
+use cubecl::std::tensor::{
+    AsView as _, AsViewExpand, AsViewMut as _, AsViewMutExpand, TensorHandle,
+};
 
 use crate::{
     ComplexTensorBinding, ComplexTensorHandle, FftError, FftNormalization,
     fft::{
         FftMode,
+        cfft::{cfft_four_step_radix2_kernel, factor_four_step},
         fft_parallel::{bit_reverse, fft_butterfly_parallel},
         limits::{max_shared_fft_n, max_units_per_cube},
     },
@@ -43,7 +48,7 @@ pub fn cfft_interleaved<R: Runtime>(
     Ok(output)
 }
 
-/// Launches a shared-memory C32 FFT into an interleaved output tensor.
+/// Launches a C32 FFT into an interleaved output tensor.
 pub fn cfft_interleaved_launch<R: Runtime>(
     client: &ComputeClient<R>,
     input: ComplexTensorBinding<'_, R>,
@@ -78,29 +83,11 @@ pub fn cfft_interleaved_launch<R: Runtime>(
         return Ok(());
     }
 
-    let log2_n = plan.n_fft.trailing_zeros() as usize;
-    let threads_per_cube = (plan.n_fft / 2).clamp(1, max_units_per_cube(client));
-    let cube_dim = CubeDim::new_1d(threads_per_cube as u32);
-    let cube_count =
-        cubecl::calculate_cube_count_elemwise(client, plan.count, CubeDim::new_single());
-    let input_tensor = input.tensor();
-    let output_tensor = output.tensor();
-
-    cfft_interleaved_shared_kernel::launch::<f32, R>(
-        client,
-        cube_count,
-        cube_dim,
-        input_tensor.into_tensor_arg(),
-        output_tensor.into_tensor_arg(),
-        plan.count_u32,
-        plan.n_fft,
-        log2_n,
-        threads_per_cube,
-        dim,
-        mode,
-        normalization,
-    );
-    Ok(())
+    if plan.n_fft <= max_shared_fft_n(client) {
+        cfft_interleaved_shared_launch(client, input, output, dim, mode, normalization, plan)
+    } else {
+        cfft_interleaved_four_step_launch(client, input, output, dim, mode, normalization, plan)
+    }
 }
 
 struct CfftPlan {
@@ -117,13 +104,9 @@ fn cfft_plan<R: Runtime>(
     validate_fft_shape(shape, dim)?;
     let n_fft = shape[dim];
     let max_n = max_shared_fft_n(client);
-    if n_fft > max_n {
-        return Err(FftError::InvalidLength {
-            name: "n_fft",
-            value: n_fft,
-            min: 2,
-            max: max_n,
-        });
+    let max_four_step_n = max_n.checked_mul(max_n).unwrap_or(usize::MAX);
+    if n_fft > max_four_step_n {
+        return Err(FftError::InvalidFftLength { n_fft });
     }
     let count = shape
         .iter()
@@ -138,6 +121,135 @@ fn cfft_plan<R: Runtime>(
         count,
         count_u32,
     })
+}
+
+fn cfft_interleaved_shared_launch<R: Runtime>(
+    client: &ComputeClient<R>,
+    input: ComplexTensorBinding<'_, R>,
+    output: ComplexTensorBinding<'_, R>,
+    dim: usize,
+    mode: FftMode,
+    normalization: FftNormalization,
+    plan: CfftPlan,
+) -> Result<(), FftError> {
+    let log2_n = plan.n_fft.trailing_zeros() as usize;
+    let threads_per_cube = (plan.n_fft / 2).clamp(1, max_units_per_cube(client));
+    let cube_dim = CubeDim::new_1d(threads_per_cube as u32);
+    let cube_count =
+        cubecl::calculate_cube_count_elemwise(client, plan.count, CubeDim::new_single());
+
+    cfft_interleaved_shared_kernel::launch::<f32, R>(
+        client,
+        cube_count,
+        cube_dim,
+        input.tensor().into_tensor_arg(),
+        output.tensor().into_tensor_arg(),
+        plan.count_u32,
+        plan.n_fft,
+        log2_n,
+        threads_per_cube,
+        dim,
+        mode,
+        normalization,
+    );
+    Ok(())
+}
+
+fn cfft_interleaved_four_step_launch<R: Runtime>(
+    client: &ComputeClient<R>,
+    input: ComplexTensorBinding<'_, R>,
+    output: ComplexTensorBinding<'_, R>,
+    dim: usize,
+    mode: FftMode,
+    normalization: FftNormalization,
+    plan: CfftPlan,
+) -> Result<(), FftError> {
+    let max_n = max_shared_fft_n(client);
+    let max_four_step_n = max_n.checked_mul(max_n).unwrap_or(usize::MAX);
+    if plan.n_fft > max_four_step_n {
+        return Err(FftError::InvalidFftLength { n_fft: plan.n_fft });
+    }
+    let (n1, n2) = factor_four_step(plan.n_fft, max_n);
+    let total = plan
+        .count
+        .checked_mul(plan.n_fft)
+        .ok_or(FftError::SizeOverflow)?;
+    let total_u32 = u32::try_from(total).map_err(|_| FftError::SizeOverflow)?;
+    let num_radix1_cubes = plan.count.checked_mul(n2).ok_or(FftError::SizeOverflow)?;
+    let num_radix1_cubes_u32 =
+        u32::try_from(num_radix1_cubes).map_err(|_| FftError::SizeOverflow)?;
+    let num_radix2_cubes = plan.count.checked_mul(n1).ok_or(FftError::SizeOverflow)?;
+    let num_radix2_cubes_u32 =
+        u32::try_from(num_radix2_cubes).map_err(|_| FftError::SizeOverflow)?;
+    let byte_len = total
+        .checked_mul(core::mem::size_of::<f32>())
+        .ok_or(FftError::SizeOverflow)?;
+    let shape = input.shape().to_vec();
+    let dtype = input.dtype();
+    let scratch_re =
+        TensorHandle::<R>::new_contiguous(shape.clone(), client.empty(byte_len), dtype);
+    let scratch_im = TensorHandle::<R>::new_contiguous(shape, client.empty(byte_len), dtype);
+    let max_units = max_units_per_cube(client);
+
+    {
+        let threads_per_cube = (n1 / 2).clamp(1, max_units);
+        let cube_dim = CubeDim::new_1d(threads_per_cube as u32);
+        let cube_count =
+            cubecl::calculate_cube_count_elemwise(client, num_radix1_cubes, CubeDim::new_single());
+        cfft_interleaved_four_step_radix1_kernel::launch::<f32, R>(
+            client,
+            cube_count,
+            cube_dim,
+            input.tensor().into_tensor_arg(),
+            scratch_re.clone().binding().into_tensor_arg(),
+            scratch_im.clone().binding().into_tensor_arg(),
+            num_radix1_cubes_u32,
+            n1,
+            n2,
+            n1.trailing_zeros() as usize,
+            threads_per_cube,
+            dim,
+            mode,
+        );
+    }
+
+    {
+        let threads_per_cube = (n2 / 2).clamp(1, max_units);
+        let cube_dim = CubeDim::new_1d(threads_per_cube as u32);
+        let cube_count =
+            cubecl::calculate_cube_count_elemwise(client, num_radix2_cubes, CubeDim::new_single());
+        cfft_four_step_radix2_kernel::launch::<f32, R>(
+            client,
+            cube_count,
+            cube_dim,
+            scratch_re.clone().binding().into_tensor_arg(),
+            scratch_im.clone().binding().into_tensor_arg(),
+            num_radix2_cubes_u32,
+            n1,
+            n2,
+            n2.trailing_zeros() as usize,
+            threads_per_cube,
+            dim,
+            mode,
+        );
+    }
+
+    let cube_dim = CubeDim::new_1d(256);
+    let cube_count = cubecl::calculate_cube_count_elemwise(client, total, cube_dim);
+    cfft_interleaved_four_step_transpose_kernel::launch::<f32, R>(
+        client,
+        cube_count,
+        cube_dim,
+        scratch_re.binding().into_tensor_arg(),
+        scratch_im.binding().into_tensor_arg(),
+        output.tensor().into_tensor_arg(),
+        total_u32,
+        n1,
+        n2,
+        dim,
+        normalization,
+    );
+    Ok(())
 }
 
 fn ensure_non_overlapping_output_layout(
@@ -264,4 +376,129 @@ fn cfft_interleaved_shared_kernel<F: Float>(
         output_im.write_checked(k, shared_im[k] * scale);
         k += threads_per_cube;
     }
+}
+
+/// First four-step pass over the strided N1 dimension of each C32 window.
+/// Reads interleaved scalar pairs and writes split scratch with the fused
+/// Cooley-Tukey twiddle.
+#[cube(launch)]
+fn cfft_interleaved_four_step_radix1_kernel<F: Float>(
+    input: &Tensor<F>,
+    scratch_re: &mut Tensor<F>,
+    scratch_im: &mut Tensor<F>,
+    num_cubes: u32,
+    #[comptime] n1: usize,
+    #[comptime] n2: usize,
+    #[comptime] log2_n1: usize,
+    #[comptime] threads_per_cube: usize,
+    #[comptime] dim: usize,
+    #[comptime] mode: FftMode,
+) {
+    let cube_pos = CUBE_POS;
+    if cube_pos >= num_cubes as usize {
+        terminate!();
+    }
+
+    let window = cube_pos / n2;
+    let n2_idx = cube_pos - window * n2;
+    let input_re = input.view(InterleavedBatchSignalLayout::new(
+        input, window, dim, 0usize,
+    ));
+    let input_im = input.view(InterleavedBatchSignalLayout::new(
+        input, window, dim, 1usize,
+    ));
+    let mut scratch_re_view = scratch_re.view_mut(crate::layout::BatchSignalLayout::new(
+        &*scratch_re,
+        window,
+        dim,
+    ));
+    let mut scratch_im_view = scratch_im.view_mut(crate::layout::BatchSignalLayout::new(
+        &*scratch_im,
+        window,
+        dim,
+    ));
+    let mut shared_re = Shared::new_slice(n1);
+    let mut shared_im = Shared::new_slice(n1);
+
+    let mut i = UNIT_POS as usize;
+    while i < n1 {
+        let j = bit_reverse(i, log2_n1);
+        let flat = i * n2 + n2_idx;
+        shared_re[j] = input_re.read_checked(flat);
+        shared_im[j] = input_im.read_checked(flat);
+        i += threads_per_cube;
+    }
+    sync_cube();
+
+    fft_butterfly_parallel::<F>(
+        &mut shared_re,
+        &mut shared_im,
+        n1,
+        log2_n1,
+        threads_per_cube,
+        mode,
+    );
+
+    let sign = F::new(mode.sign());
+    let n_total = comptime![n1 * n2];
+    let two_pi = F::new(2.0 * PI);
+    let mut k1 = UNIT_POS as usize;
+    while k1 < n1 {
+        let theta = sign * two_pi * F::cast_from(k1 * n2_idx) / F::cast_from(n_total);
+        let w_re = theta.cos();
+        let w_im = theta.sin();
+        let ar = shared_re[k1];
+        let ai = shared_im[k1];
+        let flat = k1 * n2 + n2_idx;
+        scratch_re_view.write_checked(flat, w_re * ar - w_im * ai);
+        scratch_im_view.write_checked(flat, w_re * ai + w_im * ar);
+        k1 += threads_per_cube;
+    }
+}
+
+/// Final four-step transpose writes adjacent interleaved output scalars and
+/// applies the requested normalization as part of the global store.
+#[cube(launch)]
+fn cfft_interleaved_four_step_transpose_kernel<F: Float>(
+    scratch_re: &Tensor<F>,
+    scratch_im: &Tensor<F>,
+    output: &mut Tensor<F>,
+    total: u32,
+    #[comptime] n1: usize,
+    #[comptime] n2: usize,
+    #[comptime] dim: usize,
+    #[comptime] normalization: FftNormalization,
+) {
+    let pos = ABSOLUTE_POS;
+    if pos >= total as usize {
+        terminate!();
+    }
+
+    let n_fft = comptime![n1 * n2];
+    let inner = pos % n_fft;
+    let window = pos / n_fft;
+    let scratch_re_view = scratch_re.view(crate::layout::BatchSignalLayout::new(
+        scratch_re, window, dim,
+    ));
+    let scratch_im_view = scratch_im.view(crate::layout::BatchSignalLayout::new(
+        scratch_im, window, dim,
+    ));
+    let k2 = inner / n1;
+    let k1 = inner - k2 * n1;
+    let src = k1 * n2 + k2;
+    let scale = match normalization {
+        FftNormalization::None => F::new(1.0),
+        FftNormalization::ByN => F::new(1.0) / F::cast_from(n_fft),
+        FftNormalization::Ortho => F::new(1.0) / F::cast_from(n_fft).sqrt(),
+    };
+    {
+        let mut output_re = output.view_mut(InterleavedBatchSignalLayout::new(
+            &*output, window, dim, 0usize,
+        ));
+        output_re.write_checked(inner, scratch_re_view.read_checked(src) * scale);
+    }
+    let mut output_im = output.view_mut(InterleavedBatchSignalLayout::new(
+        &*output, window, dim, 1usize,
+    ));
+    output_im.write_checked(inner, scratch_im_view.read_checked(src) * scale);
 }

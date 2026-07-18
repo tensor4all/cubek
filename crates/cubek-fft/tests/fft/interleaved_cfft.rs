@@ -76,17 +76,46 @@ fn values_for(shape: &[usize]) -> Vec<f32> {
         .collect()
 }
 
-fn round_trip(shape: Vec<usize>, dim: usize, normalization: FftNormalization) {
-    let client = <TestRuntime as Runtime>::client(&Default::default());
+fn run_round_trip(
+    client: &ComputeClient<TestRuntime>,
+    shape: Vec<usize>,
+    dim: usize,
+    normalization: FftNormalization,
+    epsilon: f32,
+) {
     let values = values_for(&shape);
-    let input = contiguous_c32(&client, shape, &values);
-    let spectrum = cfft_interleaved(input, dim, FftMode::Forward, normalization).unwrap();
+    let input = contiguous_c32(client, shape, &values);
+    let forward_normalization = match normalization {
+        FftNormalization::ByN => FftNormalization::None,
+        normalization => normalization,
+    };
+    let spectrum = cfft_interleaved(input, dim, FftMode::Forward, forward_normalization).unwrap();
     let inverse_normalization = match normalization {
         FftNormalization::None => FftNormalization::ByN,
         normalization => normalization,
     };
     let result = cfft_interleaved(spectrum, dim, FftMode::Inverse, inverse_normalization).unwrap();
-    assert_complex_scalars_approx(&client, result, &values, 1e-4);
+    assert_complex_scalars_approx(client, result, &values, epsilon);
+}
+
+fn round_trip(shape: Vec<usize>, dim: usize, normalization: FftNormalization) {
+    let client = <TestRuntime as Runtime>::client(&Default::default());
+    run_round_trip(&client, shape, dim, normalization, 1e-4);
+}
+
+fn test_max_shared_fft_n(client: &ComputeClient<TestRuntime>) -> usize {
+    let max_elems =
+        client.properties().hardware.max_shared_memory_size / (2 * core::mem::size_of::<f32>());
+    if max_elems.is_power_of_two() {
+        max_elems
+    } else {
+        max_elems.next_power_of_two() >> 1
+    }
+}
+
+#[cfg(feature = "heavy")]
+fn first_four_step_n(client: &ComputeClient<TestRuntime>) -> usize {
+    2 * test_max_shared_fft_n(client)
 }
 
 #[test]
@@ -158,6 +187,21 @@ fn cfft_interleaved_supports_minimum_n_fft() {
 #[test]
 fn cfft_interleaved_ortho_round_trip() {
     round_trip(vec![1, 8], 1, FftNormalization::Ortho);
+}
+
+#[test]
+fn cfft_interleaved_shared_memory_boundary_round_trip() {
+    let client = <TestRuntime as Runtime>::client(&Default::default());
+    let n_fft = test_max_shared_fft_n(&client);
+    run_round_trip(&client, vec![1, n_fft, 1], 1, FftNormalization::ByN, 0.03);
+}
+
+#[test]
+#[cfg(feature = "heavy")]
+fn cfft_interleaved_first_four_step_round_trip() {
+    let client = <TestRuntime as Runtime>::client(&Default::default());
+    let n_fft = first_four_step_n(&client);
+    run_round_trip(&client, vec![1, n_fft, 1], 1, FftNormalization::ByN, 0.03);
 }
 
 #[test]
