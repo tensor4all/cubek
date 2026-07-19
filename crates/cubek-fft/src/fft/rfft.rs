@@ -9,13 +9,11 @@ use crate::{
     fft::{
         FftMode,
         fft_parallel::{bit_reverse, fft_butterfly_parallel},
+        limits::{max_shared_fft_n, max_units_per_cube},
         rfft_large::rfft_large_launch,
     },
     layout::BatchSignalLayout,
 };
-
-const MAX_UNITS_PER_CUBE: usize = 256;
-pub(crate) const SHARED_MEM_CAP: usize = 4096;
 
 /// Real-valued Fast Fourier Transform.
 pub fn rfft<R: Runtime>(
@@ -127,7 +125,7 @@ pub fn rfft_launch_padded<R: Runtime>(
         return Ok(());
     }
 
-    if n_fft > SHARED_MEM_CAP {
+    if n_fft > max_shared_fft_n(client) {
         return rfft_large_launch::<R>(
             client,
             signal,
@@ -140,7 +138,7 @@ pub fn rfft_launch_padded<R: Runtime>(
     }
 
     let log2_n = n_fft.trailing_zeros() as usize;
-    let threads_per_cube = (n_fft / 2).clamp(1, MAX_UNITS_PER_CUBE);
+    let threads_per_cube = (n_fft / 2).clamp(1, max_units_per_cube(client));
 
     let cube_dim = CubeDim::new_1d(threads_per_cube as u32);
     let cube_count = cubecl::calculate_cube_count_elemwise(client, count, CubeDim::new_single());
@@ -180,10 +178,10 @@ fn rfft_kernel<F: Float>(
     }
 
     let signal_view = signal.view(BatchSignalLayout::new(signal, window_index, dim));
-    let mut spectrum_re_view =
-        spectrum_re.view_mut(BatchSignalLayout::new(spectrum_re, window_index, dim));
-    let mut spectrum_im_view =
-        spectrum_im.view_mut(BatchSignalLayout::new(spectrum_im, window_index, dim));
+    let spectrum_re_view =
+        spectrum_re.view_mut(BatchSignalLayout::new(&*spectrum_re, window_index, dim));
+    let spectrum_im_view =
+        spectrum_im.view_mut(BatchSignalLayout::new(&*spectrum_im, window_index, dim));
 
     let mut shared_re = SharedMemory::<F>::new(n_fft);
     let mut shared_im = SharedMemory::<F>::new(n_fft);
@@ -193,8 +191,8 @@ fn rfft_kernel<F: Float>(
         let j = bit_reverse(i, log2_n);
         let active = i < signal_len as usize;
         let src = select(active, i, 0);
-        shared_re[j] = select(active, signal_view[src], F::new(0.0));
-        shared_im[j] = F::new(0.0);
+        shared_re[j] = select(active, signal_view.read_checked(src), F::new(0.0_f32));
+        shared_im[j] = F::new(0.0_f32);
         i += threads_per_cube;
     }
     sync_cube();
@@ -211,8 +209,8 @@ fn rfft_kernel<F: Float>(
     let n_freq = comptime![n_fft / 2 + 1];
     let mut k = UNIT_POS as usize;
     while k < n_freq {
-        spectrum_re_view[k] = shared_re[k];
-        spectrum_im_view[k] = shared_im[k];
+        spectrum_re_view.write_checked(k, shared_re[k]);
+        spectrum_im_view.write_checked(k, shared_im[k]);
         k += threads_per_cube;
     }
     sync_cube();

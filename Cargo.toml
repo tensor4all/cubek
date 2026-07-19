@@ -5,6 +5,7 @@
 resolver = "2"
 
 members = [
+    "crates/cubek-fft",
     "crates/cubek-matmul",
     "crates/cubek-quant",
     "crates/cubek-random",
@@ -18,7 +19,6 @@ exclude = [
     "crates/cubek",
     "crates/cubek-attention",
     "crates/cubek-convolution",
-    "crates/cubek-fft",
     "crates/cubek-interpolate",
     "crates/cubek-reduce",
 ]
