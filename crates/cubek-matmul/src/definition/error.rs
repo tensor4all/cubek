@@ -101,6 +101,7 @@ impl Error for MatmulSetupError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::InvalidConfig(error) => Some(error),
+            Self::Launch(error) => Some(error),
             _ => None,
         }
     }
@@ -208,6 +209,7 @@ impl Debug for MatmulAvailabilityError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cubecl::{CompilationError, backtrace::BackTrace};
     use std::error::Error;
 
     fn assert_error_send_sync<T: Error + Send + Sync>() {}
@@ -226,6 +228,21 @@ mod tests {
         assert_eq!(
             error.source().map(ToString::to_string).as_deref(),
             Some("invalid test config")
+        );
+    }
+
+    #[test]
+    fn launch_error_is_exposed_as_the_error_source() {
+        let launch_error = LaunchError::CompilationError(CompilationError::Generic {
+            reason: "test compilation failure".into(),
+            backtrace: BackTrace::default(),
+        });
+        let expected = launch_error.to_string();
+        let error = MatmulSetupError::Launch(launch_error);
+
+        assert_eq!(
+            error.source().map(ToString::to_string).as_deref(),
+            Some(expected.as_str())
         );
     }
 }
