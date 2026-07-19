@@ -5,6 +5,7 @@
 resolver = "2"
 
 members = [
+    "crates/cubek-fft",
     "crates/cubek-matmul",
     "crates/cubek-quant",
     "crates/cubek-random",
@@ -18,7 +19,6 @@ exclude = [
     "crates/cubek",
     "crates/cubek-attention",
     "crates/cubek-convolution",
-    "crates/cubek-fft",
     "crates/cubek-interpolate",
     "crates/cubek-reduce",
 ]
@@ -35,8 +35,8 @@ version = "0.2.0"
 # PR/CI builds use the tensor4all CubeCL commit that adds the `t4a-cubecl*`
 # package manifests. Published packages use the registry packages at the same
 # exact versions.
-cubecl = { package = "t4a-cubecl", git = "https://github.com/tensor4all/cubecl.git", rev = "6424d9da407d4bc10034aee3bae52705eb5d2da0", version = "=0.10.0", default-features = false }
-cubecl-common = { package = "t4a-cubecl-common", git = "https://github.com/tensor4all/cubecl.git", rev = "6424d9da407d4bc10034aee3bae52705eb5d2da0", version = "=0.10.0", default-features = false }
+cubecl = { package = "t4a-cubecl", git = "https://github.com/tensor4all/cubecl.git", rev = "11b52669f13e27bbe188f988fd696df6d989a562", version = "=0.10.0", default-features = false }
+cubecl-common = { package = "t4a-cubecl-common", git = "https://github.com/tensor4all/cubecl.git", rev = "11b52669f13e27bbe188f988fd696df6d989a562", version = "=0.10.0", default-features = false }
 
 derive-new = { version = "0.7.0", default-features = false }
 log = { default-features = false, version = "0.4.22" }

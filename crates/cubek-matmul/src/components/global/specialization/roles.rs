@@ -21,7 +21,7 @@ pub fn make_plane_flow_config(
 
         None => {
             if load_flows.has_specialization() {
-                return Err(MatmulSetupError::InvalidConfig(Box::new(
+                return Err(MatmulSetupError::InvalidConfig(cubek_std::InvalidConfigError::new(
                     "Error: Load specialization config has specialization but no reader tasks were given."
                         .to_string(),
                 )));

@@ -1,6 +1,9 @@
 use cubecl::{CubeCount, CubeDim, VectorizationError, ir::StorageType, server::LaunchError};
 use cubek_std::{InvalidConfigError, MatrixLayout, TileSize};
-use std::fmt::{Debug, Display};
+use std::{
+    error::Error,
+    fmt::{Debug, Display},
+};
 
 /// Errors that can occur during the setup phase of a matmul operation.
 pub enum MatmulSetupError {
@@ -91,6 +94,16 @@ impl From<VectorizationError> for MatmulSetupError {
 impl Display for MatmulSetupError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{self:?}")
+    }
+}
+
+impl Error for MatmulSetupError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::InvalidConfig(error) => Some(error),
+            Self::Launch(error) => Some(error),
+            _ => None,
+        }
     }
 }
 
@@ -190,5 +203,46 @@ impl Debug for MatmulAvailabilityError {
                 writeln!(f, "No tile size is available for the problem.")
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cubecl::{CompilationError, backtrace::BackTrace};
+    use std::error::Error;
+
+    fn assert_error_send_sync<T: Error + Send + Sync>() {}
+
+    #[test]
+    fn setup_error_is_a_thread_safe_error() {
+        assert_error_send_sync::<MatmulSetupError>();
+    }
+
+    #[test]
+    fn invalid_config_is_exposed_as_the_error_source() {
+        let error = MatmulSetupError::InvalidConfig(cubek_std::InvalidConfigError::new(
+            "invalid test config",
+        ));
+
+        assert_eq!(
+            error.source().map(ToString::to_string).as_deref(),
+            Some("invalid test config")
+        );
+    }
+
+    #[test]
+    fn launch_error_is_exposed_as_the_error_source() {
+        let launch_error = LaunchError::CompilationError(CompilationError::Generic {
+            reason: "test compilation failure".into(),
+            backtrace: BackTrace::default(),
+        });
+        let expected = launch_error.to_string();
+        let error = MatmulSetupError::Launch(launch_error);
+
+        assert_eq!(
+            error.source().map(ToString::to_string).as_deref(),
+            Some(expected.as_str())
+        );
     }
 }

@@ -79,7 +79,7 @@ pub fn validate_async_barrier(device_props: &DeviceProperties) -> Result<(), Inv
         .features
         .supports_type(OpaqueType::Barrier(BarrierLevel::Cube))
     {
-        return Err(Box::new(
+        return Err(cubek_std::InvalidConfigError::new(
             "Async barrier instructions are not available on the current device",
         ));
     }
@@ -94,13 +94,13 @@ pub fn validate_async_copy(
     dtype_stage: &StorageType,
 ) -> Result<(), InvalidConfigError> {
     if !device_props.features.copy_async {
-        return Err(Box::new(
+        return Err(cubek_std::InvalidConfigError::new(
             "Async copy instructions are not available on the current device",
         ));
     }
 
     if dtype_global.size() != dtype_stage.size() {
-        return Err(Box::new(
+        return Err(cubek_std::InvalidConfigError::new(
             "Async copy requires stage and global types to be the same",
         ));
     }
@@ -108,7 +108,7 @@ pub fn validate_async_copy(
     if matches!(dtype_global, StorageType::Packed(_, _))
         && !matches!(dtype_stage, StorageType::Packed(_, _))
     {
-        return Err(Box::new(
+        return Err(cubek_std::InvalidConfigError::new(
             "Async copy doesn't support dequantizing on global read",
         ));
     }
@@ -119,7 +119,9 @@ pub fn validate_async_copy(
 /// Validates if swizzling is disabled, for loaders that can't support it.
 pub fn validate_noswizzle(config: StageMemoryConfig) -> Result<(), InvalidConfigError> {
     if config.swizzle != SwizzleMode::None {
-        return Err(Box::new("This loader doesn't support swizzling"));
+        return Err(cubek_std::InvalidConfigError::new(
+            "This loader doesn't support swizzling",
+        ));
     }
 
     Ok(())
@@ -134,7 +136,9 @@ pub fn validate_swizzle_atom_size(config: StageMemoryConfig) -> Result<(), Inval
 
     let vector_bytes = config.dtype.size() * config.vector_size as usize;
     if vector_bytes > config.swizzle.atom_size() {
-        return Err(Box::new("Load atom can't be larger than swizzle atom"));
+        return Err(cubek_std::InvalidConfigError::new(
+            "Load atom can't be larger than swizzle atom",
+        ));
     }
 
     Ok(())
@@ -148,7 +152,7 @@ pub fn validate_tma(
     global_dtype: &StorageType,
 ) -> Result<(), InvalidConfigError> {
     if !device_props.features.supports_type(SemanticType::TensorMap) {
-        return Err(Box::new(
+        return Err(cubek_std::InvalidConfigError::new(
             "Tensor memory accelerator features are not available on the current device",
         ));
     }
@@ -156,7 +160,7 @@ pub fn validate_tma(
     let stage_dtype = smem_config.dtype;
 
     if global_dtype.size() != stage_dtype.size() {
-        return Err(Box::new(
+        return Err(cubek_std::InvalidConfigError::new(
             "TMA requires stage and global types to be the same",
         ));
     }
@@ -164,7 +168,9 @@ pub fn validate_tma(
     if matches!(global_dtype, StorageType::Packed(_, _))
         && !matches!(stage_dtype, StorageType::Packed(_, _))
     {
-        return Err(Box::new("TMA doesn't support dequantizing on global read"));
+        return Err(cubek_std::InvalidConfigError::new(
+            "TMA doesn't support dequantizing on global read",
+        ));
     }
 
     if matches!(smem_config.swizzle, SwizzleMode::None) {
@@ -180,7 +186,9 @@ pub fn validate_tma(
     // Slightly tighter than the actual requirements, but simple enough and is always followed by
     // selection. Getting illegal memory access if this isn't followed for some reason.
     if row_bytes as usize != smem_config.swizzle.span_size() {
-        return Err(Box::new("Swizzling size must be equal to row size for TMA"));
+        return Err(cubek_std::InvalidConfigError::new(
+            "Swizzling size must be equal to row size for TMA",
+        ));
     }
 
     Ok(())
@@ -198,7 +206,7 @@ pub fn validate_async_copy_with_problem(
     };
 
     if is_quantized {
-        return Err(Box::new(
+        return Err(cubek_std::InvalidConfigError::new(
             "Async copy doesn't support dequantizing on global read",
         ));
     }
@@ -210,7 +218,7 @@ pub fn validate_async_copy_with_problem(
     };
 
     if stride_align_bits(strides, layout, &dtypes.global(ident.into())) < 4 {
-        return Err(Box::new(
+        return Err(cubek_std::InvalidConfigError::new(
             "Async copy requires strides to be aligned to 16 bytes",
         ));
     }
@@ -230,7 +238,9 @@ pub fn validate_tma_with_problem(
     };
 
     if is_quantized {
-        return Err(Box::new("TMA doesn't support dequantizing on global read"));
+        return Err(cubek_std::InvalidConfigError::new(
+            "TMA doesn't support dequantizing on global read",
+        ));
     }
 
     let (strides, layout) = match ident {
@@ -240,14 +250,16 @@ pub fn validate_tma_with_problem(
     };
 
     if stride_align_bits(strides, layout, &dtypes.global(ident.into())) < 4 {
-        return Err(Box::new("TMA requires strides to be aligned to 16 bytes"));
+        return Err(cubek_std::InvalidConfigError::new(
+            "TMA requires strides to be aligned to 16 bytes",
+        ));
     }
 
     if problem.lhs_batches != problem.rhs_batches
         && problem.lhs_batches.iter().product::<usize>() != 1
         && problem.rhs_batches.iter().product::<usize>() != 1
     {
-        return Err(Box::new(
+        return Err(cubek_std::InvalidConfigError::new(
             "TMA doesn't support mixing broadcast and non-broadcast dims",
         ));
     }

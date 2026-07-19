@@ -34,7 +34,7 @@ impl MatrixLayout {
                 return Ok(MatrixLayout::ColMajor);
             }
 
-            return Err(Box::new(format!(
+            return Err(crate::InvalidConfigError::new(format!(
                 "Invalid or non-contiguous matrix layout: packing_dim={packing_dim:?}"
             )));
         }
@@ -64,7 +64,7 @@ impl MatrixLayout {
             return Ok(MatrixLayout::ColMajor);
         }
 
-        Err(Box::new(format!(
+        Err(crate::InvalidConfigError::new(format!(
             "Invalid or non-contiguous matrix layout: shape={shape:?}, strides={strides:?}",
         )))
     }

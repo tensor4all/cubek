@@ -73,7 +73,7 @@ impl<TO: TilingOrder> LoadingValidation for AsyncPartialCyclicLoading<TO> {
             let num_stage_elements = config.smem_config.elements_per_stage();
 
             if max_position > num_stage_elements {
-                return Err(Box::new(
+                return Err(cubek_std::InvalidConfigError::new(
                     "Too many data will be loaded, resulting in out-of-bounds",
                 ));
             }
@@ -85,7 +85,9 @@ impl<TO: TilingOrder> LoadingValidation for AsyncPartialCyclicLoading<TO> {
             .elements_per_tile_along_contiguous_dim()
             .is_multiple_of(vector_size)
         {
-            return Err(Box::new("Tile size isn't divisible by copy vector size"));
+            return Err(cubek_std::InvalidConfigError::new(
+                "Tile size isn't divisible by copy vector size",
+            ));
         }
 
         validate_swizzle_atom_size(config.smem_config)?;

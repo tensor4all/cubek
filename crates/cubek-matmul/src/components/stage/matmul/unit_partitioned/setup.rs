@@ -140,7 +140,7 @@ impl<StageIn: StageFamily, StageAcc: StageFamily> StageMatmulFamily
                     * blueprint.tiling_scheme.partitions_per_stage_along_n(),
             ))
         } else {
-            Err(Box::new(
+            Err(cubek_std::InvalidConfigError::new(
                 "Error: Tried to use a unit stage matmul with a plane tile matmul.".to_string(),
             ))
         }
@@ -159,17 +159,21 @@ impl<StageIn: StageFamily, StageAcc: StageFamily> StageMatmulFamily
         let num_units = blueprint.plane_dim * num_compute_planes;
 
         if num_units != working_units {
-            return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-                "Error: Number of units {num_units} should be {working_units}."
-            ))));
+            return Err(MatmulSetupError::InvalidConfig(
+                cubek_std::InvalidConfigError::new(format!(
+                    "Error: Number of units {num_units} should be {working_units}."
+                )),
+            ));
         }
 
         if blueprint.partition_buffering == PartitionBuffering::Double
             && blueprint.tiling_scheme.tiles_per_stage_partition_along_n() < 2
         {
-            return Err(MatmulSetupError::InvalidConfig(Box::new(
-                "Error: Tried doing partition double buffering with only one tile to compute.",
-            )));
+            return Err(MatmulSetupError::InvalidConfig(
+                cubek_std::InvalidConfigError::new(
+                    "Error: Tried doing partition double buffering with only one tile to compute.",
+                ),
+            ));
         }
 
         blueprint

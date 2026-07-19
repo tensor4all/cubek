@@ -47,7 +47,7 @@ impl TilingValidation for BiasTilingLayout {
     fn check(config: StageMemoryConfig) -> Result<(), InvalidConfigError> {
         let stage_width = config.elements_per_stage_along_col();
         if config.vector_size > stage_width {
-            return Err(Box::new(format!(
+            return Err(cubek_std::InvalidConfigError::new(format!(
                 "Invalid vector size. Got {:?} which should not be >{:?}",
                 config.vector_size, stage_width,
             )));

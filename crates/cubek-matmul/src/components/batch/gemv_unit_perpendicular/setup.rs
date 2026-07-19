@@ -147,34 +147,42 @@ impl BatchMatmulFamily<()> for VecMatUnitPerpendicularFamily {
     ) -> Result<(), MatmulSetupError> {
         let vector_size = vector_sizes.lhs;
         if !(vector_size == vector_sizes.rhs && vector_size == vector_sizes.out) {
-            return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-                "All vector sizes must be equal, got lhs:{:?}, rhs:{:?}, out:{:?}",
-                vector_size, vector_sizes.rhs, vector_sizes.out
-            ))));
+            return Err(MatmulSetupError::InvalidConfig(
+                cubek_std::InvalidConfigError::new(format!(
+                    "All vector sizes must be equal, got lhs:{:?}, rhs:{:?}, out:{:?}",
+                    vector_size, vector_sizes.rhs, vector_sizes.out
+                )),
+            ));
         }
 
         let plane_dim = client.properties().hardware.plane_size_max as usize;
         if blueprint.tile_dim != plane_dim * vector_size {
-            return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-                "Tile dim must equal plane_dim * vector_size, got {:?} != {:?} * {:?}",
-                blueprint.tile_dim, plane_dim, vector_size,
-            ))));
+            return Err(MatmulSetupError::InvalidConfig(
+                cubek_std::InvalidConfigError::new(format!(
+                    "Tile dim must equal plane_dim * vector_size, got {:?} != {:?} * {:?}",
+                    blueprint.tile_dim, plane_dim, vector_size,
+                )),
+            ));
         }
 
         if !problem.k.is_multiple_of(vector_size) {
-            return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-                "Problem dimension k={:?} must be divisible by vector size ({:?})",
-                problem.k, vector_size,
-            ))));
+            return Err(MatmulSetupError::InvalidConfig(
+                cubek_std::InvalidConfigError::new(format!(
+                    "Problem dimension k={:?} must be divisible by vector size ({:?})",
+                    problem.k, vector_size,
+                )),
+            ));
         }
 
         let aligned_k = problem.k.is_multiple_of(blueprint.tile_dim);
         let aligned_n = problem.n.is_multiple_of(blueprint.tile_dim);
         if (!aligned_k || !aligned_n) && blueprint.check_bounds != CheckBounds::Checked {
-            return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-                "Problem dimensions n={:?}, k={:?} not divisible by tile dim ({:?}) require CheckBounds::Checked",
-                problem.n, problem.k, blueprint.tile_dim,
-            ))));
+            return Err(MatmulSetupError::InvalidConfig(
+                cubek_std::InvalidConfigError::new(format!(
+                    "Problem dimensions n={:?}, k={:?} not divisible by tile dim ({:?}) require CheckBounds::Checked",
+                    problem.n, problem.k, blueprint.tile_dim,
+                )),
+            ));
         }
 
         Ok(())

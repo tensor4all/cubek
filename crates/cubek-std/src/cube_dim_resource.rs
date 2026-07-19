@@ -77,7 +77,7 @@ impl CubeDimResource {
                 if units % plane_dim == 0 {
                     Ok(CubeDimResource::Planes(units / plane_dim))
                 } else {
-                    Err(Box::new(format!(
+                    Err(crate::InvalidConfigError::new(format!(
                         "Number of units {units:?} should be divisible by plane_dim {plane_dim:?}"
                     )))
                 }

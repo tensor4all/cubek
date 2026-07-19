@@ -252,12 +252,16 @@ fn validate_normal_input<R: Runtime>(
 ) -> Result<(), MatmulSetupError> {
     match input {
         InputBinding::Normal(_, dtype) if *dtype == c32_storage_type() => Ok(()),
-        InputBinding::Normal(_, dtype) => Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-            "complex GEMM {name} must use C32 storage, got {dtype:?}"
-        )))),
-        InputBinding::Quantized { .. } => Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-            "complex GEMM {name} does not support quantized input"
-        )))),
+        InputBinding::Normal(_, dtype) => Err(MatmulSetupError::InvalidConfig(
+            cubek_std::InvalidConfigError::new(format!(
+                "complex GEMM {name} must use C32 storage, got {dtype:?}"
+            )),
+        )),
+        InputBinding::Quantized { .. } => Err(MatmulSetupError::InvalidConfig(
+            cubek_std::InvalidConfigError::new(format!(
+                "complex GEMM {name} does not support quantized input"
+            )),
+        )),
     }
 }
 
@@ -267,19 +271,23 @@ fn validate_c32_globals(dtypes: &MatmulElems) -> Result<(), MatmulSetupError> {
         || dtypes.rhs_global != c32_type
         || dtypes.acc_global != c32_type
     {
-        return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-            "complex GEMM dtypes must be C32, got lhs={:?}, rhs={:?}, out={:?}",
-            dtypes.lhs_global, dtypes.rhs_global, dtypes.acc_global
-        ))));
+        return Err(MatmulSetupError::InvalidConfig(
+            cubek_std::InvalidConfigError::new(format!(
+                "complex GEMM dtypes must be C32, got lhs={:?}, rhs={:?}, out={:?}",
+                dtypes.lhs_global, dtypes.rhs_global, dtypes.acc_global
+            )),
+        ));
     }
     Ok(())
 }
 
 fn validate_rank(name: &'static str, shape: &Shape) -> Result<(), MatmulSetupError> {
     if shape.len() < 2 {
-        return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-            "complex GEMM {name} must have rank at least 2",
-        ))));
+        return Err(MatmulSetupError::InvalidConfig(
+            cubek_std::InvalidConfigError::new(format!(
+                "complex GEMM {name} must have rank at least 2",
+            )),
+        ));
     }
     Ok(())
 }
@@ -319,12 +327,16 @@ fn dense_matrix_strides(
     }
 
     let mut batch_stride = rows.checked_mul(cols).ok_or_else(|| {
-        MatmulSetupError::InvalidConfig(Box::new("complex GEMM batch stride overflow"))
+        MatmulSetupError::InvalidConfig(cubek_std::InvalidConfigError::new(
+            "complex GEMM batch stride overflow",
+        ))
     })?;
     for axis in (0..rank - 2).rev() {
         strides[axis] = batch_stride;
         batch_stride = batch_stride.checked_mul(shape[axis]).ok_or_else(|| {
-            MatmulSetupError::InvalidConfig(Box::new("complex GEMM batch stride overflow"))
+            MatmulSetupError::InvalidConfig(cubek_std::InvalidConfigError::new(
+                "complex GEMM batch stride overflow",
+            ))
         })?;
     }
     Ok(Strides::new(&strides))
@@ -352,7 +364,9 @@ fn metadata_with_backing<R: Runtime>(
 fn logical_len(shape: &[usize]) -> Result<usize, MatmulSetupError> {
     shape.iter().try_fold(1usize, |acc, dim| {
         acc.checked_mul(*dim).ok_or_else(|| {
-            MatmulSetupError::InvalidConfig(Box::new("complex GEMM logical length overflow"))
+            MatmulSetupError::InvalidConfig(cubek_std::InvalidConfigError::new(
+                "complex GEMM logical length overflow",
+            ))
         })
     })
 }

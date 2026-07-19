@@ -299,9 +299,9 @@ fn validate_cmma<R: Runtime>(
     }
 
     if blueprint.swizzle_modes.has_swizzle() {
-        return Err(MatmulSetupError::InvalidConfig(Box::new(
-            "This tile matmul doesn't support swizzling",
-        )));
+        return Err(MatmulSetupError::InvalidConfig(
+            cubek_std::InvalidConfigError::new("This tile matmul doesn't support swizzling"),
+        ));
     }
 
     Ok(())
@@ -363,40 +363,50 @@ fn validate_register<R: Runtime>(
     match blueprint.lhs_layout {
         MatrixLayout::RowMajor => {
             if !k.is_multiple_of(lhs) {
-                return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-                    "Tile shape in vectorized axis k({k:?}) should be divisible by vector size lhs({lhs:?})"
-                ))));
+                return Err(MatmulSetupError::InvalidConfig(
+                    cubek_std::InvalidConfigError::new(format!(
+                        "Tile shape in vectorized axis k({k:?}) should be divisible by vector size lhs({lhs:?})"
+                    )),
+                ));
             }
         }
         MatrixLayout::ColMajor => {
             if !m.is_multiple_of(lhs) {
-                return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-                    "Tile shape in vectorized axis m({m:?}) should be divisible by vector size lhs({lhs:?})"
-                ))));
+                return Err(MatmulSetupError::InvalidConfig(
+                    cubek_std::InvalidConfigError::new(format!(
+                        "Tile shape in vectorized axis m({m:?}) should be divisible by vector size lhs({lhs:?})"
+                    )),
+                ));
             }
         }
     }
     match blueprint.rhs_layout {
         MatrixLayout::RowMajor => {
             if !n.is_multiple_of(rhs) {
-                return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-                    "Tile shape in vectorized axis n({n:?}) should be divisible by vector size rhs({rhs:?})"
-                ))));
+                return Err(MatmulSetupError::InvalidConfig(
+                    cubek_std::InvalidConfigError::new(format!(
+                        "Tile shape in vectorized axis n({n:?}) should be divisible by vector size rhs({rhs:?})"
+                    )),
+                ));
             }
         }
         MatrixLayout::ColMajor => {
             if !k.is_multiple_of(rhs) {
-                return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-                    "Tile shape in vectorized axis k({k:?}) should be divisible by vector size rhs({rhs:?})"
-                ))));
+                return Err(MatmulSetupError::InvalidConfig(
+                    cubek_std::InvalidConfigError::new(format!(
+                        "Tile shape in vectorized axis k({k:?}) should be divisible by vector size rhs({rhs:?})"
+                    )),
+                ));
             }
         }
     }
 
     if !n.is_multiple_of(out) {
-        return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-            "Tile shape in vectorized axis n({n:?}) should be divisible by vector size out({out:?})"
-        ))));
+        return Err(MatmulSetupError::InvalidConfig(
+            cubek_std::InvalidConfigError::new(format!(
+                "Tile shape in vectorized axis n({n:?}) should be divisible by vector size out({out:?})"
+            )),
+        ));
     }
 
     Ok(())
@@ -411,15 +421,15 @@ fn validate_plane_vec<R: Runtime>(
     check_types_available(client, dtypes, true)?;
 
     if blueprint.lhs_layout != MatrixLayout::RowMajor {
-        return Err(MatmulSetupError::InvalidConfig(Box::new(
-            "Only Row Major layout is supported for Lhs",
-        )));
+        return Err(MatmulSetupError::InvalidConfig(
+            cubek_std::InvalidConfigError::new("Only Row Major layout is supported for Lhs"),
+        ));
     }
 
     if blueprint.rhs_layout != MatrixLayout::ColMajor {
-        return Err(MatmulSetupError::InvalidConfig(Box::new(
-            "Only Col Major layout is supported for Rhs",
-        )));
+        return Err(MatmulSetupError::InvalidConfig(
+            cubek_std::InvalidConfigError::new("Only Col Major layout is supported for Rhs"),
+        ));
     }
 
     let m = blueprint.tiling_scheme.tile_size.m();
@@ -431,28 +441,34 @@ fn validate_plane_vec<R: Runtime>(
     let out_vector = vector_sizes.out as u32;
 
     if m != 1 {
-        return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-            "Only m=1 is supported, got m={m:?}",
-        ))));
+        return Err(MatmulSetupError::InvalidConfig(
+            cubek_std::InvalidConfigError::new(format!("Only m=1 is supported, got m={m:?}",)),
+        ));
     }
 
     if lhs_vector != rhs_vector {
-        return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-            "Lhs and Rhs must have same vector size, got lhs={lhs_vector:?} and rhs={rhs_vector:?}",
-        ))));
+        return Err(MatmulSetupError::InvalidConfig(
+            cubek_std::InvalidConfigError::new(format!(
+                "Lhs and Rhs must have same vector size, got lhs={lhs_vector:?} and rhs={rhs_vector:?}",
+            )),
+        ));
     }
 
     if k != blueprint.plane_dim * lhs_vector {
-        return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-            "k must be equal to plane_dim times vector size (of both lhs and rhs), got k={:?}, plane_dim={:?} vector_size={:?}",
-            k, blueprint.plane_dim, lhs_vector
-        ))));
+        return Err(MatmulSetupError::InvalidConfig(
+            cubek_std::InvalidConfigError::new(format!(
+                "k must be equal to plane_dim times vector size (of both lhs and rhs), got k={:?}, plane_dim={:?} vector_size={:?}",
+                k, blueprint.plane_dim, lhs_vector
+            )),
+        ));
     }
 
     if !n.is_multiple_of(out_vector) {
-        return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-            "n must be divisible by out vector size, got n={n:?}, out_vector_size={out_vector:?}",
-        ))));
+        return Err(MatmulSetupError::InvalidConfig(
+            cubek_std::InvalidConfigError::new(format!(
+                "n must be divisible by out vector size, got n={n:?}, out_vector_size={out_vector:?}",
+            )),
+        ));
     }
 
     Ok(())
@@ -472,10 +488,12 @@ fn validate_interleaved<R: Runtime>(
 
     let plane_dim = blueprint.plane_dim;
     if !k.is_multiple_of(plane_dim) {
-        return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-            "k must be divisible by plane_dim. Got k={:?}, plane_dim={:?}",
-            k, plane_dim,
-        ))));
+        return Err(MatmulSetupError::InvalidConfig(
+            cubek_std::InvalidConfigError::new(format!(
+                "k must be divisible by plane_dim. Got k={:?}, plane_dim={:?}",
+                k, plane_dim,
+            )),
+        ));
     }
 
     let k_local = k / plane_dim;
@@ -487,40 +505,50 @@ fn validate_interleaved<R: Runtime>(
     match blueprint.lhs_layout {
         MatrixLayout::RowMajor => {
             if !k_local.is_multiple_of(lhs) {
-                return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-                    "Local shape in vectorized axis k ({k_local:?}) should be divisible by vector size lhs ({lhs:?})"
-                ))));
+                return Err(MatmulSetupError::InvalidConfig(
+                    cubek_std::InvalidConfigError::new(format!(
+                        "Local shape in vectorized axis k ({k_local:?}) should be divisible by vector size lhs ({lhs:?})"
+                    )),
+                ));
             }
         }
         MatrixLayout::ColMajor => {
             if !m.is_multiple_of(lhs) {
-                return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-                    "Tile shape in vectorized axis m ({m:?}) should be divisible by vector size lhs ({lhs:?})"
-                ))));
+                return Err(MatmulSetupError::InvalidConfig(
+                    cubek_std::InvalidConfigError::new(format!(
+                        "Tile shape in vectorized axis m ({m:?}) should be divisible by vector size lhs ({lhs:?})"
+                    )),
+                ));
             }
         }
     }
     match blueprint.rhs_layout {
         MatrixLayout::RowMajor => {
             if !n.is_multiple_of(rhs) {
-                return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-                    "Tile shape in vectorized axis n ({n:?}) should be divisible by vector size rhs ({rhs:?})"
-                ))));
+                return Err(MatmulSetupError::InvalidConfig(
+                    cubek_std::InvalidConfigError::new(format!(
+                        "Tile shape in vectorized axis n ({n:?}) should be divisible by vector size rhs ({rhs:?})"
+                    )),
+                ));
             }
         }
         MatrixLayout::ColMajor => {
             if !k_local.is_multiple_of(rhs) {
-                return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-                    "Local shape in vectorized axis k ({k_local:?}) should be divisible by vector size rhs ({rhs:?})"
-                ))));
+                return Err(MatmulSetupError::InvalidConfig(
+                    cubek_std::InvalidConfigError::new(format!(
+                        "Local shape in vectorized axis k ({k_local:?}) should be divisible by vector size rhs ({rhs:?})"
+                    )),
+                ));
             }
         }
     }
 
     if !n.is_multiple_of(out) {
-        return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-            "Tile shape in vectorized axis n ({n:?}) should be divisible by vector size out ({out:?})"
-        ))));
+        return Err(MatmulSetupError::InvalidConfig(
+            cubek_std::InvalidConfigError::new(format!(
+                "Tile shape in vectorized axis n ({n:?}) should be divisible by vector size out ({out:?})"
+            )),
+        ));
     }
 
     Ok(())
