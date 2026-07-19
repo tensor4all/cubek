@@ -186,9 +186,11 @@ where
         let resources = if !blueprint.load_flows.has_specialization() {
             SMM::cubedim_resource(blueprint)
         } else {
-            return Err(MatmulSetupError::InvalidConfig(Box::new(
-                "Specialization is unavailable for simple matmul.",
-            )));
+            return Err(MatmulSetupError::InvalidConfig(
+                cubek_std::InvalidConfigError::new(
+                    "Specialization is unavailable for simple matmul.",
+                ),
+            ));
         }?;
 
         Ok(resources)

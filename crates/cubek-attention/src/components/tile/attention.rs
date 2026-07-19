@@ -184,7 +184,7 @@ fn validate_unit(
     let check_divisible =
         |dim: u32, vec_size: u32, name: &str, vec_name: &str| -> Result<(), AttentionSetupError> {
             if !dim.is_multiple_of(vec_size) {
-                return Err(AttentionSetupError::InvalidConfig(Box::new(format!(
+                return Err(AttentionSetupError::InvalidConfig(cubek_std::InvalidConfigError::new(format!(
                     "Tile's {} ({:?}) must be divisible by {} vector size ({:?})",
                     name, dim, vec_name, vec_size
                 ))));
@@ -223,7 +223,7 @@ fn validate_blackbox(
     dtypes: &AttentionElems,
 ) -> Result<(), AttentionSetupError> {
     if dtypes.query_global != dtypes.query_tile {
-        return Err(AttentionSetupError::InvalidConfig(Box::new(
+        return Err(AttentionSetupError::InvalidConfig(cubek_std::InvalidConfigError::new(
             "Query global and tile types must be the same because no stage to cast in between",
         )));
     }
@@ -268,7 +268,7 @@ fn validate_blackbox(
     }
 
     if line_sizes_mask > 1 {
-        return Err(AttentionSetupError::InvalidConfig(Box::new(
+        return Err(AttentionSetupError::InvalidConfig(cubek_std::InvalidConfigError::new(
             "Line size mask > 1 not supported yet on accelerated tile attention",
         )));
     }
@@ -278,13 +278,13 @@ fn validate_blackbox(
     let softmax_total = softmax_num_rows * softmax_num_cols;
 
     if !softmax_total.is_multiple_of(cfg.plane_dim) {
-        return Err(AttentionSetupError::InvalidConfig(Box::new(
+        return Err(AttentionSetupError::InvalidConfig(cubek_std::InvalidConfigError::new(
             "Softmax size should be divisible by plane dim",
         )));
     }
 
     if cfg.inner_layout == InnerLayout::Contiguous && softmax_num_rows > cfg.plane_dim {
-        return Err(AttentionSetupError::InvalidConfig(Box::new(
+        return Err(AttentionSetupError::InvalidConfig(cubek_std::InvalidConfigError::new(
             "More than one row per unit not supported with this inner layout",
         )));
     }
@@ -292,13 +292,13 @@ fn validate_blackbox(
     if cfg.inner_layout == InnerLayout::SplitRows
         && !softmax_total.is_multiple_of(2 * cfg.plane_dim)
     {
-        return Err(AttentionSetupError::InvalidConfig(Box::new(
+        return Err(AttentionSetupError::InvalidConfig(cubek_std::InvalidConfigError::new(
             "With split rows, units must have two elements each",
         )));
     }
 
     if cfg.tile_size.head_dim < cfg.tile_size.val_dim {
-        return Err(AttentionSetupError::InvalidConfig(Box::new(
+        return Err(AttentionSetupError::InvalidConfig(cubek_std::InvalidConfigError::new(
             "Can't have tile head_dim < tile val dim (not sure why)",
         )));
     }

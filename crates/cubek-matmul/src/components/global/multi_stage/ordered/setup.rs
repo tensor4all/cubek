@@ -215,9 +215,11 @@ where
         RL::validate_with_problem(problem, dtypes, StageIdent::Rhs)?;
 
         if blueprint.tiling_scheme.partitions_per_stage_along_n() > 1 {
-            return Err(MatmulSetupError::InvalidConfig(Box::new(
-                "Ordered does not support number of stage partitions > 1 in n",
-            )));
+            return Err(MatmulSetupError::InvalidConfig(
+                cubek_std::InvalidConfigError::new(
+                    "Ordered does not support number of stage partitions > 1 in n",
+                ),
+            ));
         }
 
         SMM::validate_blueprint(client, blueprint, dtypes, vector_sizes)

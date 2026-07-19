@@ -46,7 +46,7 @@ impl<TO: TilingOrder> LoadingValidation for SyncPartialCyclicLoading<TO> {
             let num_stage_elements = config.smem_config.elements_per_stage();
 
             if max_position > num_stage_elements {
-                return Err(Box::new(
+                return Err(cubek_std::InvalidConfigError::new(
                     "Too many data will be loaded, resulting in out-of-bounds",
                 ));
             }

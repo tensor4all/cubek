@@ -29,7 +29,7 @@ impl LoadingValidation for SyncFullStridedLoading {
         let total_units = config.loading_units_count();
 
         if !num_stage_vectors.is_multiple_of(total_units) {
-            return Err(Box::new(format!(
+            return Err(cubek_std::InvalidConfigError::new(format!(
                 "Too many data will be loaded, resulting in out of bounds.
         Try setting vector size and number of planes so that total unit count {total_units:?} divides number of vectors in stage.",
             )));

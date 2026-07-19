@@ -58,7 +58,7 @@ impl<SK: StageFamily, SV: StageFamily, SO: StageFamily<ReadWrite>> StageAttentio
                 CubeDimResource::Units(units * blueprint.tiling_scheme.stage_size.seq_q)
             }
             _ => {
-                return Err(AttentionSetupError::InvalidConfig(Box::new(
+                return Err(AttentionSetupError::InvalidConfig(cubek_std::InvalidConfigError::new(
                     "Error: Expected unit tile attention, got a plane tile attention".to_string(),
                 )));
             }

@@ -348,7 +348,7 @@ impl<TO: TilingOrder> TilingValidation for ContiguousTilingLayout<TO> {
     fn check(config: StageMemoryConfig) -> Result<(), InvalidConfigError> {
         let tile_width = config.elements_per_tile_along_contiguous_dim();
         if config.vector_size > tile_width {
-            return Err(Box::new(format!(
+            return Err(cubek_std::InvalidConfigError::new(format!(
                 "Invalid vector size. Got {:?} which should not be >{:?}",
                 config.vector_size, tile_width,
             )));
@@ -441,7 +441,7 @@ impl TilingValidation for StridedTilingLayout {
     fn check(config: StageMemoryConfig) -> Result<(), InvalidConfigError> {
         let stage_width = config.elements_per_stage_along_contiguous_dim();
         if config.vector_size > stage_width {
-            return Err(Box::new(format!(
+            return Err(cubek_std::InvalidConfigError::new(format!(
                 "Invalid vector size. Got {:?} which should not be >{:?}",
                 config.vector_size, stage_width,
             )));

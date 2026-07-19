@@ -133,9 +133,9 @@ impl BatchMatmulFamily<()> for NaiveBatchMatmulFamily {
         vector_sizes: &MatmulVectorSizes,
     ) -> Result<(), MatmulSetupError> {
         if blueprint.vector_size_out > 1 {
-            return Err(MatmulSetupError::InvalidConfig(Box::new(
-                "Vector size on output not supported",
-            )));
+            return Err(MatmulSetupError::InvalidConfig(
+                cubek_std::InvalidConfigError::new("Vector size on output not supported"),
+            ));
         }
 
         if let Some(scheme) = problem.lhs_scheme
@@ -145,9 +145,11 @@ impl BatchMatmulFamily<()> for NaiveBatchMatmulFamily {
             let block_size = block_size.to_dim_vec(2.max(block_size.len()));
             let block_width = block_size[block_size.len() - 1] as usize;
             if !block_width.is_multiple_of(vector_size) {
-                return Err(MatmulSetupError::InvalidConfig(Box::new(
-                    "Block size isn't a multiple of load size on lhs",
-                )));
+                return Err(MatmulSetupError::InvalidConfig(
+                    cubek_std::InvalidConfigError::new(
+                        "Block size isn't a multiple of load size on lhs",
+                    ),
+                ));
             }
         }
 
@@ -158,9 +160,11 @@ impl BatchMatmulFamily<()> for NaiveBatchMatmulFamily {
             let block_size = block_size.to_dim_vec(2.max(block_size.len()));
             let block_width = block_size[block_size.len() - 2] as usize;
             if !block_width.is_multiple_of(vector_size) {
-                return Err(MatmulSetupError::InvalidConfig(Box::new(
-                    "Block size isn't a multiple of load size on rhs",
-                )));
+                return Err(MatmulSetupError::InvalidConfig(
+                    cubek_std::InvalidConfigError::new(
+                        "Block size isn't a multiple of load size on rhs",
+                    ),
+                ));
             }
         }
 

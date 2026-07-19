@@ -32,10 +32,12 @@ impl GemvKind {
                 MatrixLayout::RowMajor => GemvKind::MatVecRowMajor,
             })
         } else {
-            Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-                "Problem is not a valid GEMV, got (m,n,k)=({:?},{:?},{:?})",
-                problem.m, problem.n, problem.k
-            ))))
+            Err(MatmulSetupError::InvalidConfig(
+                cubek_std::InvalidConfigError::new(format!(
+                    "Problem is not a valid GEMV, got (m,n,k)=({:?},{:?},{:?})",
+                    problem.m, problem.n, problem.k
+                )),
+            ))
         }
     }
 }

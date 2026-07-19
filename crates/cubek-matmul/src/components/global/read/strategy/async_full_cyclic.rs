@@ -50,7 +50,7 @@ impl<TO: TilingOrder> LoadingValidation for AsyncFullCyclicLoading<TO> {
             let total_units = config.loading_units_count();
 
             if !num_stage_vectors.is_multiple_of(total_units) {
-                return Err(Box::new(format!(
+                return Err(cubek_std::InvalidConfigError::new(format!(
                 "Too many data will be loaded, resulting in out of bounds.
         Try setting vector size and number of planes so that total unit count {total_units:?} divides number of vectors in stage.",
             )));
@@ -63,7 +63,9 @@ impl<TO: TilingOrder> LoadingValidation for AsyncFullCyclicLoading<TO> {
             .elements_per_tile_along_contiguous_dim()
             .is_multiple_of(vector_size)
         {
-            return Err(Box::new("Tile size isn't divisible by copy vector size"));
+            return Err(cubek_std::InvalidConfigError::new(
+                "Tile size isn't divisible by copy vector size",
+            ));
         }
 
         validate_swizzle_atom_size(config.smem_config)?;

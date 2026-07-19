@@ -57,10 +57,12 @@ pub fn launch_ref<R: Runtime>(
     let plane_size = client.properties().hardware.plane_size_max as usize;
 
     if !k.is_multiple_of(plane_size) {
-        return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-            "Dimension k={} must be a multiple of plane size {}",
-            k, plane_size
-        ))));
+        return Err(MatmulSetupError::InvalidConfig(
+            cubek_std::InvalidConfigError::new(format!(
+                "Dimension k={} must be a multiple of plane size {}",
+                k, plane_size
+            )),
+        ));
     }
 
     let lhs_vector_size = vector_size_for(client, &lhs, dtypes.lhs_global.size(), plane_size, k)?;
@@ -120,13 +122,17 @@ pub fn launch_ref<R: Runtime>(
 
     if device_settings.plane_dim > 1 {
         if matches!(expand_info.blueprint.kind, GemvKind::MatVecColMajor) {
-            return Err(MatmulSetupError::InvalidConfig(Box::new(
-                "On GPU, MatVec plane parallel only supports row major lhs for now",
-            )));
+            return Err(MatmulSetupError::InvalidConfig(
+                cubek_std::InvalidConfigError::new(
+                    "On GPU, MatVec plane parallel only supports row major lhs for now",
+                ),
+            ));
         } else if matches!(expand_info.blueprint.kind, GemvKind::VecMatRowMajor) {
-            return Err(MatmulSetupError::InvalidConfig(Box::new(
-                "On GPU, Vecmat plane parallel only supports col major rhs for now",
-            )));
+            return Err(MatmulSetupError::InvalidConfig(
+                cubek_std::InvalidConfigError::new(
+                    "On GPU, Vecmat plane parallel only supports col major rhs for now",
+                ),
+            ));
         }
     }
 

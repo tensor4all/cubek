@@ -68,7 +68,7 @@ impl Routine for UnitRoutine {
                 CubeDimResource::Units(units * blueprint.tiling_scheme.stage_size.seq_q)
             }
             _ => {
-                return Err(AttentionSetupError::InvalidConfig(Box::new(
+                return Err(AttentionSetupError::InvalidConfig(cubek_std::InvalidConfigError::new(
                     "Error: Expected unit tile attention, got a plane tile attention".to_string(),
                 )));
             }
@@ -136,7 +136,7 @@ fn validate(
     blueprint: AttentionBlueprint,
 ) -> Result<AttentionBlueprint, AttentionSetupError> {
     if !(problem.dims.head_dim as u32).is_multiple_of(blueprint.tiling_scheme.tile_size.head_dim) {
-        return Err(AttentionSetupError::InvalidConfig(Box::new(
+        return Err(AttentionSetupError::InvalidConfig(cubek_std::InvalidConfigError::new(
             "Tile size head dim must divide problem head dim".to_string(),
         )));
     }
@@ -144,7 +144,7 @@ fn validate(
     if blueprint.tiling_scheme.partition_size.head_dim * blueprint.tiling_scheme.tile_size.head_dim
         != problem.dims.head_dim as u32
     {
-        return Err(AttentionSetupError::InvalidConfig(Box::new(format!(
+        return Err(AttentionSetupError::InvalidConfig(cubek_std::InvalidConfigError::new(format!(
             "Tiling scheme's total head dim ({}) does not match problem's head dim ({})",
             blueprint.tiling_scheme.partition_size.head_dim
                 * blueprint.tiling_scheme.tile_size.head_dim,

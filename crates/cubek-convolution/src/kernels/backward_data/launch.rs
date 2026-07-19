@@ -195,7 +195,7 @@ where
 /// rejected.
 #[allow(dead_code)]
 pub(crate) fn unsupported_tma_error() -> ConvSetupError {
-    ConvSetupError::Matmul(MatmulSetupError::InvalidConfig(Box::new(
+    ConvSetupError::Matmul(MatmulSetupError::InvalidConfig(cubek_std::InvalidConfigError::new(
         "Data backprop doesn't yet work with current TMA tiling strategy",
     )))
 }

@@ -60,9 +60,9 @@ pub fn launch_ref<R: Runtime>(
     let k = lhs.shape().to_vec()[rank - 1];
 
     if m != 1 {
-        return Err(MatmulSetupError::InvalidConfig(Box::new(
-            "m must equal 1 to qualify as a vecmat problem",
-        )));
+        return Err(MatmulSetupError::InvalidConfig(
+            cubek_std::InvalidConfigError::new("m must equal 1 to qualify as a vecmat problem"),
+        ));
     }
 
     let rhs_shape = rhs.shape();
@@ -70,17 +70,21 @@ pub fn launch_ref<R: Runtime>(
     let plane_size = client.properties().hardware.plane_size_max as usize;
 
     if !k.is_multiple_of(plane_size) {
-        return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-            "Lhs dimension k={} must be a multiple of plane size {}",
-            k, plane_size
-        ))));
+        return Err(MatmulSetupError::InvalidConfig(
+            cubek_std::InvalidConfigError::new(format!(
+                "Lhs dimension k={} must be a multiple of plane size {}",
+                k, plane_size
+            )),
+        ));
     }
 
     if !n.is_multiple_of(plane_size) {
-        return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-            "Rhs dimension n={} must be a multiple of plane size {}",
-            n, plane_size
-        ))));
+        return Err(MatmulSetupError::InvalidConfig(
+            cubek_std::InvalidConfigError::new(format!(
+                "Rhs dimension n={} must be a multiple of plane size {}",
+                n, plane_size
+            )),
+        ));
     }
 
     let lhs_vector_size = vector_size_for(client, &lhs, dtypes.lhs_global.size(), plane_size, k)?;
@@ -119,9 +123,11 @@ pub fn launch_ref<R: Runtime>(
     );
 
     if problem.rhs_layout != MatrixLayout::RowMajor {
-        return Err(MatmulSetupError::InvalidConfig(Box::new(
-            "Vecmat unit perpendicular only supports row major rhs for now",
-        )));
+        return Err(MatmulSetupError::InvalidConfig(
+            cubek_std::InvalidConfigError::new(
+                "Vecmat unit perpendicular only supports row major rhs for now",
+            ),
+        ));
     }
 
     let device_settings = GemvUnitPerpendicularRoutine::device_settings(client, vector_sizes);

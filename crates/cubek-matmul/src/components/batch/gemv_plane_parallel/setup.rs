@@ -143,41 +143,51 @@ impl BatchMatmulFamily<()> for GemvPlaneParallelFamily {
         vector_sizes: &MatmulVectorSizes,
     ) -> Result<(), MatmulSetupError> {
         if vector_sizes.lhs != vector_sizes.rhs {
-            return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-                "Lhs and Rhs vector sizes must be equal, got lhs:{:?}, rhs:{:?}",
-                vector_sizes.lhs, vector_sizes.rhs
-            ))));
+            return Err(MatmulSetupError::InvalidConfig(
+                cubek_std::InvalidConfigError::new(format!(
+                    "Lhs and Rhs vector sizes must be equal, got lhs:{:?}, rhs:{:?}",
+                    vector_sizes.lhs, vector_sizes.rhs
+                )),
+            ));
         }
 
         if vector_sizes.out != 1 {
-            return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-                "Out vector size must be 1, got {:?}",
-                vector_sizes.out,
-            ))));
+            return Err(MatmulSetupError::InvalidConfig(
+                cubek_std::InvalidConfigError::new(format!(
+                    "Out vector size must be 1, got {:?}",
+                    vector_sizes.out,
+                )),
+            ));
         }
 
         let plane_dim = client.properties().hardware.plane_size_max as usize;
         if blueprint.tile_dim != plane_dim * vector_sizes.lhs {
-            return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-                "Tile dim must equal plane_dim * vector_size, got {:?} != {:?} * {:?}",
-                blueprint.tile_dim, plane_dim, vector_sizes.lhs,
-            ))));
+            return Err(MatmulSetupError::InvalidConfig(
+                cubek_std::InvalidConfigError::new(format!(
+                    "Tile dim must equal plane_dim * vector_size, got {:?} != {:?} * {:?}",
+                    blueprint.tile_dim, plane_dim, vector_sizes.lhs,
+                )),
+            ));
         }
 
         if !problem.k.is_multiple_of(blueprint.tile_dim) {
-            return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-                "Problem dimensions k={:?} must be divisible by tile dim ({:?})",
-                problem.k, blueprint.tile_dim,
-            ))));
+            return Err(MatmulSetupError::InvalidConfig(
+                cubek_std::InvalidConfigError::new(format!(
+                    "Problem dimensions k={:?} must be divisible by tile dim ({:?})",
+                    problem.k, blueprint.tile_dim,
+                )),
+            ));
         }
 
         match blueprint.kind {
             GemvKind::VecMatRowMajor => {
                 if !problem.n.is_multiple_of(blueprint.tile_dim) {
-                    return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-                        "For VecMatTransposeSwap, problem.n ({:?}) must be divisible by tile_dim ({:?})",
-                        problem.n, blueprint.tile_dim,
-                    ))));
+                    return Err(MatmulSetupError::InvalidConfig(
+                        cubek_std::InvalidConfigError::new(format!(
+                            "For VecMatTransposeSwap, problem.n ({:?}) must be divisible by tile_dim ({:?})",
+                            problem.n, blueprint.tile_dim,
+                        )),
+                    ));
                 }
 
                 if blueprint.tile_dim
@@ -186,22 +196,26 @@ impl BatchMatmulFamily<()> for GemvPlaneParallelFamily {
                     * vector_sizes.rhs
                     > client.properties().hardware.max_shared_memory_size
                 {
-                    return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-                        "Requesting too much shared memory, requested {:?}, max {:?}",
-                        blueprint.tile_dim
-                            * blueprint.tile_dim
-                            * dtypes.rhs_global.size()
-                            * vector_sizes.rhs,
-                        client.properties().hardware.max_shared_memory_size
-                    ))));
+                    return Err(MatmulSetupError::InvalidConfig(
+                        cubek_std::InvalidConfigError::new(format!(
+                            "Requesting too much shared memory, requested {:?}, max {:?}",
+                            blueprint.tile_dim
+                                * blueprint.tile_dim
+                                * dtypes.rhs_global.size()
+                                * vector_sizes.rhs,
+                            client.properties().hardware.max_shared_memory_size
+                        )),
+                    ));
                 }
             }
             GemvKind::MatVecColMajor => {
                 if !problem.m.is_multiple_of(blueprint.tile_dim) {
-                    return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-                        "For MatVecTransposeSwap, problem.m ({:?}) must be divisible by tile_dim ({:?})",
-                        problem.m, blueprint.tile_dim,
-                    ))));
+                    return Err(MatmulSetupError::InvalidConfig(
+                        cubek_std::InvalidConfigError::new(format!(
+                            "For MatVecTransposeSwap, problem.m ({:?}) must be divisible by tile_dim ({:?})",
+                            problem.m, blueprint.tile_dim,
+                        )),
+                    ));
                 }
 
                 if blueprint.tile_dim
@@ -210,14 +224,16 @@ impl BatchMatmulFamily<()> for GemvPlaneParallelFamily {
                     * vector_sizes.lhs
                     > client.properties().hardware.max_shared_memory_size
                 {
-                    return Err(MatmulSetupError::InvalidConfig(Box::new(format!(
-                        "Requesting too much shared memory, requested {:?}, max {:?}",
-                        blueprint.tile_dim
-                            * blueprint.tile_dim
-                            * dtypes.lhs_global.size()
-                            * vector_sizes.lhs,
-                        client.properties().hardware.max_shared_memory_size
-                    ))));
+                    return Err(MatmulSetupError::InvalidConfig(
+                        cubek_std::InvalidConfigError::new(format!(
+                            "Requesting too much shared memory, requested {:?}, max {:?}",
+                            blueprint.tile_dim
+                                * blueprint.tile_dim
+                                * dtypes.lhs_global.size()
+                                * vector_sizes.lhs,
+                            client.properties().hardware.max_shared_memory_size
+                        )),
+                    ));
                 }
             }
             _ => {}
