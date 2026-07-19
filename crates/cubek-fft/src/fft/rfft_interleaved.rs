@@ -319,4 +319,5 @@ fn rfft_interleaved_kernel<F: Float>(
         spectrum_im.write_checked(k, shared_im[k] * scale);
         k += threads_per_cube;
     }
+    sync_cube();
 }

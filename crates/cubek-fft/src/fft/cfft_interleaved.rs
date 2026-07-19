@@ -376,6 +376,7 @@ fn cfft_interleaved_shared_kernel<F: Float>(
         output_im.write_checked(k, shared_im[k] * scale);
         k += threads_per_cube;
     }
+    sync_cube();
 }
 
 /// First four-step pass over the strided N1 dimension of each C32 window.
