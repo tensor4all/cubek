@@ -28,15 +28,15 @@ edition = "2024"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 rust-version = "1.92"
-version = "0.2.0"
+version = "0.2.1"
 
 [workspace.dependencies]
 ### tensor4all fork release preparation. ###
 # PR/CI builds use the tensor4all CubeCL commit that adds the `t4a-cubecl*`
 # package manifests. Published packages use the registry packages at the same
 # exact versions.
-cubecl = { package = "t4a-cubecl", git = "https://github.com/tensor4all/cubecl.git", rev = "a2adda17affd40494393a1f40d90980e1235617c", version = "=0.10.0", default-features = false }
-cubecl-common = { package = "t4a-cubecl-common", git = "https://github.com/tensor4all/cubecl.git", rev = "a2adda17affd40494393a1f40d90980e1235617c", version = "=0.10.0", default-features = false }
+cubecl = { package = "t4a-cubecl", git = "https://github.com/tensor4all/cubecl.git", rev = "6709076b7a9072ac4f409e345a2c22380a84a885", version = "=0.10.1", default-features = false }
+cubecl-common = { package = "t4a-cubecl-common", git = "https://github.com/tensor4all/cubecl.git", rev = "6709076b7a9072ac4f409e345a2c22380a84a885", version = "=0.10.1", default-features = false }
 
 derive-new = { version = "0.7.0", default-features = false }
 log = { default-features = false, version = "0.4.22" }

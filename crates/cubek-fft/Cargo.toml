@@ -9,7 +9,10 @@ name = "cubek-fft"
 publish = false
 readme.workspace = true
 repository = "https://github.com/tensor4all/cubek/tree/main/crates/cubek-fft"
-version.workspace = true
+# `cubek-fft` is not published from this fork (`publish = false`, and the
+# crates.io name belongs to upstream), so its version stays on the 0.2.0 line
+# that tenferro-rs requires for both the git revision and the registry.
+version = "0.2.0"
 
 [features]
 default = ["std", "cubecl/default"]
@@ -24,7 +27,7 @@ cpu-reference = ["dep:num-complex", "dep:cubek-test-utils"]
 [dependencies]
 cubecl = { workspace = true }
 thiserror = { workspace = true }
-cubek-test-utils = { package = "t4a-cubek-test-utils", path = "./../cubek-test-utils/", version = "=0.2.0", default-features = false, optional = true }
+cubek-test-utils = { package = "t4a-cubek-test-utils", path = "./../cubek-test-utils/", version = "=0.2.1", default-features = false, optional = true }
 num-complex = { version = "0.4.6", optional = true }
 
 [dev-dependencies]
@@ -32,4 +35,4 @@ num-complex = "0.4.6"
 cubecl = { workspace = true, features = ["test-runtime"] }
 cubecl-common = { workspace = true }
 cubek-fft = { path = ".", features = ["cpu-reference"] }
-cubek-test-utils = { package = "t4a-cubek-test-utils", path = "./../cubek-test-utils/", version = "=0.2.0", default-features = false }
+cubek-test-utils = { package = "t4a-cubek-test-utils", path = "./../cubek-test-utils/", version = "=0.2.1", default-features = false }

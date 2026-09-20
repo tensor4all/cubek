@@ -24,8 +24,8 @@ full = ["extended"]
 cpu-reference = ["dep:cubek-test-utils"]
 
 [dependencies]
-cubek-std = { package = "t4a-cubek-std", path = "../cubek-std", version = "0.2.0", default-features = false }
-cubek-test-utils = { package = "t4a-cubek-test-utils", path = "../cubek-test-utils", version = "0.2.0", default-features = false, optional = true }
+cubek-std = { package = "t4a-cubek-std", path = "../cubek-std", version = "0.2.1", default-features = false }
+cubek-test-utils = { package = "t4a-cubek-test-utils", path = "../cubek-test-utils", version = "0.2.1", default-features = false, optional = true }
 
 bytemuck = { workspace = true }
 cubecl = { workspace = true, features = ["stdlib"] }
@@ -37,8 +37,8 @@ serde = { workspace = true }
 [dev-dependencies]
 cubecl = { workspace = true, features = ["test-runtime"] }
 cubek-matmul = { package = "t4a-cubek-matmul", path = ".", features = ["cpu-reference"] }
-cubek-test-utils = { package = "t4a-cubek-test-utils", path = "../cubek-test-utils", version = "0.2.0", default-features = false }
-cubek-quant = { package = "t4a-cubek-quant", path = "../cubek-quant", version = "0.2.0", features = [
+cubek-test-utils = { package = "t4a-cubek-test-utils", path = "../cubek-test-utils", version = "0.2.1", default-features = false }
+cubek-quant = { package = "t4a-cubek-quant", path = "../cubek-quant", version = "0.2.1", features = [
     "kernels",
 ] }
 pretty_assertions = { workspace = true }
