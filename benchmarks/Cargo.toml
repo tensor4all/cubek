@@ -56,7 +56,7 @@ cubek-attention = { path = "../crates/cubek-attention", version = "0.2.1", featu
 cubek-convolution = { path = "../crates/cubek-convolution", version = "0.2.1", features = [
     "cpu-reference",
 ], optional = true }
-cubek-fft = { path = "../crates/cubek-fft", version = "0.2.0", features = [
+cubek-fft = { package = "t4a-cubek-fft", path = "../crates/cubek-fft", version = "0.2.1", features = [
     "cpu-reference",
 ], optional = true }
 cubek-reduce = { path = "../crates/cubek-reduce", version = "0.2.1", features = [

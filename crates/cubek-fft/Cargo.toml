@@ -5,14 +5,17 @@ description = "CubeK: Fast Fourier Transform"
 edition.workspace = true
 keywords = []
 license.workspace = true
-name = "cubek-fft"
-publish = false
+name = "t4a-cubek-fft"
 readme.workspace = true
 repository = "https://github.com/tensor4all/cubek/tree/main/crates/cubek-fft"
-# `cubek-fft` is not published from this fork (`publish = false`, and the
-# crates.io name belongs to upstream), so its version stays on the 0.2.0 line
-# that tenferro-rs requires for both the git revision and the registry.
-version = "0.2.0"
+# The crates.io name `cubek-fft` belongs to upstream, so this fork publishes its
+# FFT crate as `t4a-cubek-fft` (the same pattern as `t4a-cubek-matmul` and
+# `t4a-cubek-std`). The library name stays `cubek_fft` for consumers such as
+# tenferro-gpu, which depend on the renamed package.
+version.workspace = true
+
+[lib]
+name = "cubek_fft"
 
 [features]
 default = ["std", "cubecl/default"]
@@ -34,5 +37,5 @@ num-complex = { version = "0.4.6", optional = true }
 num-complex = "0.4.6"
 cubecl = { workspace = true, features = ["test-runtime"] }
 cubecl-common = { workspace = true }
-cubek-fft = { path = ".", features = ["cpu-reference"] }
+cubek-fft = { package = "t4a-cubek-fft", path = ".", features = ["cpu-reference"] }
 cubek-test-utils = { package = "t4a-cubek-test-utils", path = "./../cubek-test-utils/", version = "=0.2.1", default-features = false }

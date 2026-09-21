@@ -61,5 +61,5 @@ cubek-matmul = { package = "t4a-cubek-matmul", path = "../cubek-matmul", version
 cubek-quant = { package = "t4a-cubek-quant", path = "../cubek-quant", version = "0.2.1", default-features = false, optional = true }
 cubek-random = { package = "t4a-cubek-random", path = "../cubek-random", version = "0.2.1", default-features = false, optional = true }
 cubek-reduce = { path = "../cubek-reduce", version = "0.2.1", default-features = false, optional = true }
-cubek-fft = { path = "../cubek-fft", version = "0.2.1", default-features = false, optional = true }
+cubek-fft = { package = "t4a-cubek-fft", path = "../cubek-fft", version = "0.2.1", default-features = false, optional = true }
 cubek-std = { package = "t4a-cubek-std", path = "../cubek-std", version = "0.2.1", default-features = false, optional = true }
