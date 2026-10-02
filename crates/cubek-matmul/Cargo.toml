@@ -49,5 +49,12 @@ serde = { workspace = true }
 cubek-matmul = { path = ".", default-features = false, features = ["cpu-reference"] }
 cubek-test-utils = { workspace = true }
 cubek-quant = { workspace = true, features = ["kernels"] }
+num-complex = { workspace = true }
 
 cubecl = { workspace = true, features = ["test-runtime"] }
+
+# `tests/lib.rs` mounts `complex` as a module; without an explicit target,
+# Cargo auto-discovery would also run `tests/complex.rs` on its own.
+[[test]]
+name = "lib"
+path = "tests/lib.rs"

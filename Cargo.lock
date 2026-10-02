@@ -1379,6 +1379,7 @@ dependencies = [
  "cubek-test-utils",
  "cubek-tile",
  "half",
+ "num-complex",
  "serde",
 ]
 
