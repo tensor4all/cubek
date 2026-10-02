@@ -1,5 +1,6 @@
 #![allow(unused, clippy::upper_case_acronyms)]
 
+mod complex;
 mod harness;
 
 mod auto;
