@@ -300,7 +300,9 @@ impl Layout for BatchLayout {
         batch_offs
     }
 
-    #[allow(clippy::legacy_numeric_constants)]
+    // `usize::MAX` is not expandable inside `#[cube]`; the deprecated
+    // `max_value()` call is.
+    #[allow(clippy::legacy_numeric_constants, deprecated)]
     fn shape(&self) -> Self::Coordinates {
         usize::max_value()
     }
@@ -335,7 +337,9 @@ impl Layout for NoopLayout {
         pos
     }
 
-    #[allow(clippy::legacy_numeric_constants)]
+    // `usize::MAX` is not expandable inside `#[cube]`; the deprecated
+    // `max_value()` call is.
+    #[allow(clippy::legacy_numeric_constants, deprecated)]
     fn shape(&self) -> Self::Coordinates {
         usize::max_value()
     }

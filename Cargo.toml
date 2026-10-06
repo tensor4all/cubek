@@ -28,15 +28,20 @@ edition = "2024"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 rust-version = "1.92"
-version = "0.2.1"
+version = "0.2.2"
+
+[workspace.lints.clippy]
+# Temporary workaround for linting generated code:
+# https://github.com/rust-lang/rust-clippy/issues/17525
+redundant_field_names = "allow"
 
 [workspace.dependencies]
 ### tensor4all fork release preparation. ###
 # PR/CI builds use the tensor4all CubeCL commit that adds the `t4a-cubecl*`
 # package manifests. Published packages use the registry packages at the same
 # exact versions.
-cubecl = { package = "t4a-cubecl", git = "https://github.com/tensor4all/cubecl.git", rev = "ffc017d5440b34a293f3bcd47e93e7fc51f1d733", version = "=0.10.1", default-features = false }
-cubecl-common = { package = "t4a-cubecl-common", git = "https://github.com/tensor4all/cubecl.git", rev = "ffc017d5440b34a293f3bcd47e93e7fc51f1d733", version = "=0.10.1", default-features = false }
+cubecl = { package = "t4a-cubecl", git = "https://github.com/tensor4all/cubecl.git", rev = "eb2c8894d585d2d119a1b76fcc3094bc44b73deb", version = "=0.10.2", default-features = false }
+cubecl-common = { package = "t4a-cubecl-common", git = "https://github.com/tensor4all/cubecl.git", rev = "eb2c8894d585d2d119a1b76fcc3094bc44b73deb", version = "=0.10.2", default-features = false }
 
 derive-new = { version = "0.7.0", default-features = false }
 log = { default-features = false, version = "0.4.22" }
