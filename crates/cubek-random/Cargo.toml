@@ -32,3 +32,6 @@ half = { workspace = true }
 
 [dev-dependencies]
 cubecl = { workspace = true, features = ["test-runtime"] }
+
+[lints]
+workspace = true
