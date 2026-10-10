@@ -40,8 +40,8 @@ redundant_field_names = "allow"
 # PR/CI builds use the tensor4all CubeCL commit that adds the `t4a-cubecl*`
 # package manifests. Published packages use the registry packages at the same
 # exact versions.
-cubecl = { package = "t4a-cubecl", git = "https://github.com/tensor4all/cubecl.git", rev = "daf456db9b889d947909b69f56af7bb580db723f", version = "=0.10.2", default-features = false }
-cubecl-common = { package = "t4a-cubecl-common", git = "https://github.com/tensor4all/cubecl.git", rev = "daf456db9b889d947909b69f56af7bb580db723f", version = "=0.10.2", default-features = false }
+cubecl = { package = "t4a-cubecl", git = "https://github.com/tensor4all/cubecl.git", rev = "bf20b930256823f1d9ef62a54f43bbf06dc70f46", version = "=0.10.2", default-features = false }
+cubecl-common = { package = "t4a-cubecl-common", git = "https://github.com/tensor4all/cubecl.git", rev = "bf20b930256823f1d9ef62a54f43bbf06dc70f46", version = "=0.10.2", default-features = false }
 
 derive-new = { version = "0.7.0", default-features = false }
 log = { default-features = false, version = "0.4.22" }
