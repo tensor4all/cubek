@@ -5,7 +5,7 @@ description = "CubeK: Convolution Kernels"
 edition.workspace = true
 keywords = []
 license.workspace = true
-name = "cubek-convolution"
+name = "t4a-cubek-convolution"
 readme.workspace = true
 repository = "https://github.com/tracel-ai/cubek/tree/main/crates/cubek-convolution"
 version.workspace = true
@@ -28,10 +28,10 @@ cpu-reference = ["dep:cubek-test-utils", "cubek-matmul/cpu-reference"]
 benchmarks = ["cpu-reference", "cubecl/test-runtime"]
 
 [dependencies]
-cubek-matmul = { workspace = true, features = ["multi-level"] }
-cubek-std = { workspace = true }
-cubek-tile = { workspace = true }
-cubek-test-utils = { workspace = true, optional = true }
+cubek-matmul = { package = "t4a-cubek-matmul", workspace = true, features = ["multi-level"] }
+cubek-std = { package = "t4a-cubek-std", workspace = true }
+cubek-tile = { package = "t4a-cubek-tile", workspace = true }
+cubek-test-utils = { package = "t4a-cubek-test-utils", workspace = true, optional = true }
 
 cubecl = { workspace = true, features = ["stdlib"] }
 cubecl-common = { workspace = true }
@@ -42,7 +42,7 @@ half = { workspace = true, features = ["bytemuck"] }
 serde = { workspace = true }
 
 [dev-dependencies]
-cubek-convolution = { path = ".", features = ["cpu-reference"] }
-cubek-test-utils = { workspace = true }
+cubek-convolution = { package = "t4a-cubek-convolution", path = ".", features = ["cpu-reference"] }
+cubek-test-utils = { package = "t4a-cubek-test-utils", workspace = true }
 
 cubecl = { workspace = true, features = ["test-runtime"] }

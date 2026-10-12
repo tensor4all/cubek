@@ -5,7 +5,7 @@ description = "CubeK: Random Number Generation"
 edition.workspace = true
 keywords = []
 license.workspace = true
-name = "cubek-random"
+name = "t4a-cubek-random"
 readme.workspace = true
 repository = "https://github.com/tracel-ai/cubek/tree/main/crates/cubek-random"
 version.workspace = true
@@ -26,8 +26,8 @@ full = ["extended", "benchmarks"]
 benchmarks = ["dep:cubek-test-utils", "cubecl/test-runtime"]
 
 [dependencies]
-cubek-std = { workspace = true }
-cubek-test-utils = { workspace = true, optional = true }
+cubek-std = { package = "t4a-cubek-std", workspace = true }
+cubek-test-utils = { package = "t4a-cubek-test-utils", workspace = true, optional = true }
 
 cubecl = { workspace = true }
 cubecl-common = { workspace = true }

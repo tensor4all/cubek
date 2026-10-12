@@ -5,7 +5,7 @@ description = "CubeK: Pool"
 edition.workspace = true
 keywords = []
 license.workspace = true
-name = "cubek-pool"
+name = "t4a-cubek-pool"
 readme.workspace = true
 repository = "https://github.com/tracel-ai/cubek/tree/main/crates/cubek-pool"
 version.workspace = true
@@ -25,7 +25,7 @@ benchmarks = ["cpu-reference", "cubecl/test-runtime"]
 cpu-reference = ["dep:cubek-test-utils"]
 
 [dependencies]
-cubek-test-utils = { workspace = true, optional = true }
+cubek-test-utils = { package = "t4a-cubek-test-utils", workspace = true, optional = true }
 
 cubecl = { workspace = true }
 cubecl-common = { workspace = true }
@@ -33,7 +33,7 @@ cubecl-common = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-cubek-pool = { path = ".", features = ["cpu-reference", "benchmarks"] }
-cubek-test-utils = { workspace = true }
+cubek-pool = { package = "t4a-cubek-pool", path = ".", features = ["cpu-reference", "benchmarks"] }
+cubek-test-utils = { package = "t4a-cubek-test-utils", workspace = true }
 
 cubecl = { workspace = true, features = ["test-runtime"] }

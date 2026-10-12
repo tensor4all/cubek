@@ -5,7 +5,7 @@ description = "CubeK: Interpolation"
 edition.workspace = true
 keywords = []
 license.workspace = true
-name = "cubek-interpolate"
+name = "t4a-cubek-interpolate"
 readme.workspace = true
 repository = "https://github.com/tracel-ai/cubek/tree/main/crates/cubek-interpolate"
 version.workspace = true
@@ -28,8 +28,8 @@ cpu-reference = ["dep:cubek-test-utils"]
 benchmarks = ["cpu-reference", "cubecl/test-runtime"]
 
 [dependencies]
-cubek-tile = { workspace = true }
-cubek-test-utils = { workspace = true, optional = true }
+cubek-tile = { package = "t4a-cubek-tile", workspace = true }
+cubek-test-utils = { package = "t4a-cubek-test-utils", workspace = true, optional = true }
 
 cubecl = { workspace = true }
 cubecl-common = { workspace = true }
@@ -39,7 +39,7 @@ thiserror = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]
-cubek-interpolate = { path = ".", features = ["cpu-reference"] }
-cubek-test-utils = { workspace = true }
+cubek-interpolate = { package = "t4a-cubek-interpolate", path = ".", features = ["cpu-reference"] }
+cubek-test-utils = { package = "t4a-cubek-test-utils", workspace = true }
 
 cubecl = { workspace = true, features = ["test-runtime"] }

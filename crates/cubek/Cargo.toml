@@ -8,7 +8,7 @@ description = "CubeK: CubeCL Kernels"
 edition.workspace = true
 keywords = []
 license.workspace = true
-name = "cubek"
+name = "t4a-cubek"
 readme.workspace = true
 repository = "https://github.com/tracel-ai/cubek"
 version.workspace = true
@@ -66,14 +66,14 @@ fft = ["cubek-fft"]
 
 [dependencies]
 cubecl = { workspace = true }
-cubek-attention = { workspace = true, optional = true }
-cubek-convolution = { workspace = true, optional = true }
-cubek-fft = { workspace = true, optional = true }
-cubek-interpolate = { workspace = true, optional = true }
-cubek-matmul = { workspace = true, optional = true }
-cubek-pool = { workspace = true, optional = true }
-cubek-quant = { workspace = true, optional = true }
-cubek-random = { workspace = true, optional = true }
-cubek-reduce = { workspace = true, optional = true }
-cubek-std = { workspace = true, optional = true }
-cubek-tile = { workspace = true, optional = true }
+cubek-attention = { package = "t4a-cubek-attention", workspace = true, optional = true }
+cubek-convolution = { package = "t4a-cubek-convolution", workspace = true, optional = true }
+cubek-fft = { package = "t4a-cubek-fft", workspace = true, optional = true }
+cubek-interpolate = { package = "t4a-cubek-interpolate", workspace = true, optional = true }
+cubek-matmul = { package = "t4a-cubek-matmul", workspace = true, optional = true }
+cubek-pool = { package = "t4a-cubek-pool", workspace = true, optional = true }
+cubek-quant = { package = "t4a-cubek-quant", workspace = true, optional = true }
+cubek-random = { package = "t4a-cubek-random", workspace = true, optional = true }
+cubek-reduce = { package = "t4a-cubek-reduce", workspace = true, optional = true }
+cubek-std = { package = "t4a-cubek-std", workspace = true, optional = true }
+cubek-tile = { package = "t4a-cubek-tile", workspace = true, optional = true }

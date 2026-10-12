@@ -5,7 +5,7 @@ description = "CubeK: Matrix Multiplication Kernels"
 edition.workspace = true
 keywords = []
 license.workspace = true
-name = "cubek-matmul"
+name = "t4a-cubek-matmul"
 readme.workspace = true
 repository = "https://github.com/tracel-ai/cubek/tree/main/crates/cubek-matmul"
 version.workspace = true
@@ -32,10 +32,10 @@ cpu-reference = ["dep:cubek-test-utils", "cubek-std/testing"]
 benchmarks = ["cpu-reference", "dep:cubek-quant", "cubecl/test-runtime"]
 
 [dependencies]
-cubek-quant = { workspace = true, optional = true, features = ["kernels"] }
-cubek-std = { workspace = true }
-cubek-tile = { workspace = true, optional = true }
-cubek-test-utils = { workspace = true, optional = true }
+cubek-quant = { package = "t4a-cubek-quant", workspace = true, optional = true, features = ["kernels"] }
+cubek-std = { package = "t4a-cubek-std", workspace = true }
+cubek-tile = { package = "t4a-cubek-tile", workspace = true, optional = true }
+cubek-test-utils = { package = "t4a-cubek-test-utils", workspace = true, optional = true }
 
 cubecl = { workspace = true, features = ["stdlib"] }
 cubecl-common = { workspace = true }
@@ -46,9 +46,9 @@ serde = { workspace = true }
 
 [dev-dependencies]
 # Enable reference helpers for tests without publishing a versioned self-dependency.
-cubek-matmul = { path = ".", default-features = false, features = ["cpu-reference"] }
-cubek-test-utils = { workspace = true }
-cubek-quant = { workspace = true, features = ["kernels"] }
+cubek-matmul = { package = "t4a-cubek-matmul", path = ".", default-features = false, features = ["cpu-reference"] }
+cubek-test-utils = { package = "t4a-cubek-test-utils", workspace = true }
+cubek-quant = { package = "t4a-cubek-quant", workspace = true, features = ["kernels"] }
 num-complex = { workspace = true }
 
 cubecl = { workspace = true, features = ["test-runtime"] }

@@ -6,7 +6,7 @@ authors = [
 description = "CubeK: Test Utils"
 edition.workspace = true
 license.workspace = true
-name = "cubek-test-utils"
+name = "t4a-cubek-test-utils"
 readme.workspace = true
 rust-version.workspace = true
 repository = "https://github.com/tracel-ai/cubek/tree/main/crates/cubek-test-utils"
@@ -24,7 +24,7 @@ extended = ["heavy"]
 full = ["extended"]
 
 [dependencies]
-cubek-tile = { workspace = true }
+cubek-tile = { package = "t4a-cubek-tile", workspace = true }
 
 cubecl = { workspace = true, features = ["stdlib", "test-runtime"] }
 cubecl-common = { workspace = true, features = ["fp8"] }

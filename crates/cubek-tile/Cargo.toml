@@ -3,7 +3,7 @@ authors = ["louisfd <louisfd94@gmail.com>"]
 description = "CubeK: Tile"
 edition.workspace = true
 license.workspace = true
-name = "cubek-tile"
+name = "t4a-cubek-tile"
 readme.workspace = true
 rust-version.workspace = true
 repository = "https://github.com/tracel-ai/cubek/tree/main/crates/cubek-tile"
@@ -32,5 +32,5 @@ serde = { workspace = true }
 cubecl = { workspace = true, features = ["test-runtime"] }
 # Omit versions so Cargo excludes these dev-dependencies when publishing;
 # both crates depend on cubek-tile and must be published after it.
-cubek-quant = { path = "../cubek-quant", default-features = false }
-cubek-test-utils = { path = "../cubek-test-utils", default-features = false }
+cubek-quant = { package = "t4a-cubek-quant", path = "../cubek-quant", default-features = false }
+cubek-test-utils = { package = "t4a-cubek-test-utils", path = "../cubek-test-utils", default-features = false }

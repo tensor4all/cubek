@@ -1,5 +1,8 @@
 name: publish
 
+# Generated for the ported 0.3.0 release: one job per workspace crate, in
+# dependency order, each gated on the crates it needs.
+
 on:
   push:
     tags:
@@ -7,160 +10,169 @@ on:
   workflow_dispatch:
     inputs:
       dry-run-only:
-        description: "Run xtask publish in dry-run mode (no publish)"
+        description: "Run crate publish jobs in dry-run mode (no publish)"
         type: boolean
         required: false
         default: false
 
 jobs:
-  publish-cubek-random:
+  publish-t4a-cubek-tile:
     needs:
-      - publish-cubek-std
-    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v11
+      - publish-t4a-cubek-quant
+      - publish-t4a-cubek-test-utils
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v8
     with:
-      crate: cubek-random
+      crate: t4a-cubek-tile
       dry-run-only: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run-only || false }}
     secrets:
       CRATES_IO_API_TOKEN: ${{ secrets.CRATES_IO_API_TOKEN }}
 
-  publish-cubek-test-utils:
+  publish-t4a-cubek-test-utils:
     needs:
-      - publish-cubek-tile
-    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v11
+      - publish-t4a-cubek-tile
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v8
     with:
-      crate: cubek-test-utils
+      crate: t4a-cubek-test-utils
       dry-run-only: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run-only || false }}
     secrets:
       CRATES_IO_API_TOKEN: ${{ secrets.CRATES_IO_API_TOKEN }}
 
-  publish-cubek-quant:
+  publish-t4a-cubek-quant:
     needs:
-      - publish-cubek-tile
-      - publish-cubek-test-utils
-    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v11
+      - publish-t4a-cubek-test-utils
+      - publish-t4a-cubek-tile
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v8
     with:
-      crate: cubek-quant
+      crate: t4a-cubek-quant
       dry-run-only: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run-only || false }}
     secrets:
       CRATES_IO_API_TOKEN: ${{ secrets.CRATES_IO_API_TOKEN }}
 
-  publish-cubek-reduce:
+  publish-t4a-cubek-std:
     needs:
-      - publish-cubek-test-utils
-      - publish-cubek-std
-    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v11
+      - publish-t4a-cubek-test-utils
+      - publish-t4a-cubek-tile
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v8
     with:
-      crate: cubek-reduce
+      crate: t4a-cubek-std
       dry-run-only: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run-only || false }}
     secrets:
       CRATES_IO_API_TOKEN: ${{ secrets.CRATES_IO_API_TOKEN }}
 
-  publish-cubek-matmul:
+  publish-t4a-cubek-matmul:
     needs:
-      - publish-cubek-reduce
-      - publish-cubek-quant
-      - publish-cubek-tile
-      - publish-cubek-test-utils
-      - publish-cubek-std
-    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v11
+      - publish-t4a-cubek-matmul
+      - publish-t4a-cubek-quant
+      - publish-t4a-cubek-std
+      - publish-t4a-cubek-test-utils
+      - publish-t4a-cubek-tile
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v8
     with:
-      crate: cubek-matmul
+      crate: t4a-cubek-matmul
       dry-run-only: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run-only || false }}
     secrets:
       CRATES_IO_API_TOKEN: ${{ secrets.CRATES_IO_API_TOKEN }}
 
-  publish-cubek-convolution:
+  publish-t4a-cubek-attention:
     needs:
-      - publish-cubek-reduce
-      - publish-cubek-matmul
-      - publish-cubek-test-utils
-      - publish-cubek-std
-    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v11
+      - publish-t4a-cubek-attention
+      - publish-t4a-cubek-matmul
+      - publish-t4a-cubek-std
+      - publish-t4a-cubek-test-utils
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v8
     with:
-      crate: cubek-convolution
+      crate: t4a-cubek-attention
       dry-run-only: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run-only || false }}
     secrets:
       CRATES_IO_API_TOKEN: ${{ secrets.CRATES_IO_API_TOKEN }}
 
-  publish-cubek-attention:
+  publish-t4a-cubek-convolution:
     needs:
-      - publish-cubek-reduce
-      - publish-cubek-matmul
-      - publish-cubek-test-utils
-      - publish-cubek-std
-    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v11
+      - publish-t4a-cubek-convolution
+      - publish-t4a-cubek-matmul
+      - publish-t4a-cubek-std
+      - publish-t4a-cubek-test-utils
+      - publish-t4a-cubek-tile
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v8
     with:
-      crate: cubek-attention
+      crate: t4a-cubek-convolution
       dry-run-only: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run-only || false }}
     secrets:
       CRATES_IO_API_TOKEN: ${{ secrets.CRATES_IO_API_TOKEN }}
 
-  publish-cubek-fft:
+  publish-t4a-cubek-fft:
     needs:
-      - publish-cubek-test-utils
-      - publish-cubek-std
-    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v11
+      - publish-t4a-cubek-fft
+      - publish-t4a-cubek-test-utils
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v8
     with:
-      crate: cubek-fft
-      dry-run-only: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run-only || false }}
-    secrets:
-      CRATES_IO_API_TOKEN: ${{ secrets.CRATES_IO_API_TOKEN }}
-  
-  publish-cubek-interpolate:
-    needs:
-      - publish-cubek-test-utils
-    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v11
-    with:
-      crate: cubek-interpolate
-      dry-run-only: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run-only || false }}
-    secrets:
-      CRATES_IO_API_TOKEN: ${{ secrets.CRATES_IO_API_TOKEN }}
-  
-  publish-cubek-pool:
-    needs:
-      - publish-cubek-test-utils
-    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v11
-    with:
-      crate: cubek-pool
+      crate: t4a-cubek-fft
       dry-run-only: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run-only || false }}
     secrets:
       CRATES_IO_API_TOKEN: ${{ secrets.CRATES_IO_API_TOKEN }}
 
-  publish-cubek-tile:
-    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v11
+  publish-t4a-cubek-interpolate:
+    needs:
+      - publish-t4a-cubek-interpolate
+      - publish-t4a-cubek-test-utils
+      - publish-t4a-cubek-tile
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v8
     with:
-      crate: cubek-tile
+      crate: t4a-cubek-interpolate
       dry-run-only: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run-only || false }}
     secrets:
       CRATES_IO_API_TOKEN: ${{ secrets.CRATES_IO_API_TOKEN }}
 
-  publish-cubek-std:
+  publish-t4a-cubek-pool:
     needs:
-      - publish-cubek-test-utils
-    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v11
+      - publish-t4a-cubek-pool
+      - publish-t4a-cubek-test-utils
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v8
     with:
-      crate: cubek-std
+      crate: t4a-cubek-pool
       dry-run-only: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run-only || false }}
     secrets:
       CRATES_IO_API_TOKEN: ${{ secrets.CRATES_IO_API_TOKEN }}
 
-  publish-cubek:
+  publish-t4a-cubek-random:
     needs:
-      - publish-cubek-random
-      - publish-cubek-reduce
-      - publish-cubek-quant
-      - publish-cubek-matmul
-      - publish-cubek-attention
-      - publish-cubek-convolution
-      - publish-cubek-fft
-      - publish-cubek-interpolate
-      - publish-cubek-pool
-      - publish-cubek-tile
-      - publish-cubek-test-utils
-      - publish-cubek-std
-    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v11
+      - publish-t4a-cubek-std
+      - publish-t4a-cubek-test-utils
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v8
     with:
-      crate: cubek
+      crate: t4a-cubek-random
+      dry-run-only: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run-only || false }}
+    secrets:
+      CRATES_IO_API_TOKEN: ${{ secrets.CRATES_IO_API_TOKEN }}
+
+  publish-t4a-cubek-reduce:
+    needs:
+      - publish-t4a-cubek-reduce
+      - publish-t4a-cubek-std
+      - publish-t4a-cubek-test-utils
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v8
+    with:
+      crate: t4a-cubek-reduce
+      dry-run-only: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run-only || false }}
+    secrets:
+      CRATES_IO_API_TOKEN: ${{ secrets.CRATES_IO_API_TOKEN }}
+
+  publish-t4a-cubek:
+    needs:
+      - publish-t4a-cubek-attention
+      - publish-t4a-cubek-convolution
+      - publish-t4a-cubek-fft
+      - publish-t4a-cubek-interpolate
+      - publish-t4a-cubek-matmul
+      - publish-t4a-cubek-pool
+      - publish-t4a-cubek-quant
+      - publish-t4a-cubek-random
+      - publish-t4a-cubek-reduce
+      - publish-t4a-cubek-std
+      - publish-t4a-cubek-tile
+    uses: tracel-ai/github-actions/.github/workflows/publish-crate.yml@v8
+    with:
+      crate: t4a-cubek
       dry-run-only: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run-only || false }}
     secrets:
       CRATES_IO_API_TOKEN: ${{ secrets.CRATES_IO_API_TOKEN }}

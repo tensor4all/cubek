@@ -3,7 +3,7 @@ authors = ["louisfd <louisfd94@gmail.com>"]
 description = "CubeK: Standard Library"
 edition.workspace = true
 license.workspace = true
-name = "cubek-std"
+name = "t4a-cubek-std"
 readme.workspace = true
 rust-version.workspace = true
 repository = "https://github.com/tracel-ai/cubek/tree/main/crates/cubek-std"
@@ -31,11 +31,11 @@ benchmarks = ["testing"]
 
 [dependencies]
 # For `swizzle`, which is walk arithmetic and lives with the walk.
-cubek-tile = { workspace = true }
-cubek-test-utils = { workspace = true, optional = true }
+cubek-tile = { package = "t4a-cubek-tile", workspace = true }
+cubek-test-utils = { package = "t4a-cubek-test-utils", workspace = true, optional = true }
 
 cubecl = { workspace = true, features = ["stdlib"] }
 cubecl-common = { workspace = true }
 
 [dev-dependencies]
-cubek-test-utils = { workspace = true }
+cubek-test-utils = { package = "t4a-cubek-test-utils", workspace = true }
