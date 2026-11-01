@@ -1,3 +1,6 @@
+// INVARIANT: CubeCL's AutotuneKey derive generates redundant field initializers in this module.
+#![allow(clippy::redundant_field_names)]
+
 use cubecl::{
     zspace::{Shape, Strides},
     {AutotuneKey, Runtime, quant::scheme::QuantScheme},
