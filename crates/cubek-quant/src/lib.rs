@@ -1,4 +1,10 @@
-#![cfg_attr(not(feature = "std"), no_std)]
+//! Quantization schemes and kernels.
+//!
+//! The Rust standard library is required, even with `--no-default-features`.
+//! The pinned CubeCL 0.10 runtime depends on `async-channel` with its `std`
+//! feature enabled, which pulls in `parking` through `event-listener-strategy`
+//! and `event-listener`. Disabling this crate's default features disables the
+//! kernels, but does not make its dependencies compatible with `no_std` targets.
 
 extern crate alloc;
 
