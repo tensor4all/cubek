@@ -16,6 +16,7 @@ name = "cubek_quant"
 [features]
 default = ["kernels"]
 kernels = ["std"]
+# Rust std is required by the CubeCL 0.10 runtime even when this feature is disabled.
 std = []
 
 heavy = []
