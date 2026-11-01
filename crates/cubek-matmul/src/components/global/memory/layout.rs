@@ -300,7 +300,8 @@ impl Layout for BatchLayout {
         batch_offs
     }
 
-    #[allow(clippy::legacy_numeric_constants)]
+    // INVARIANT: Keep CubeCL's max_value intrinsic; usize::MAX is not expanded by the pinned macro.
+    #[allow(deprecated, clippy::legacy_numeric_constants)]
     fn shape(&self) -> Self::Coordinates {
         usize::max_value()
     }
@@ -335,7 +336,8 @@ impl Layout for NoopLayout {
         pos
     }
 
-    #[allow(clippy::legacy_numeric_constants)]
+    // INVARIANT: Keep CubeCL's max_value intrinsic; usize::MAX is not expanded by the pinned macro.
+    #[allow(deprecated, clippy::legacy_numeric_constants)]
     fn shape(&self) -> Self::Coordinates {
         usize::max_value()
     }
